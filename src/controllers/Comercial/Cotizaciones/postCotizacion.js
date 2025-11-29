@@ -1,0 +1,50 @@
+const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
+const generarCorrelativa = require("./correlativa");
+
+const postCotizacion = async (req, res) => {
+  const {
+    proyecto_id,
+    tipoDeServicio,
+    tiempoDeEntrega,
+    analisis,
+    gastosOperativos,
+    gastosAdministrativos,
+    gastosGenerales,
+    totalSinIgv,
+    totalConIgv,
+    igv,
+    estado,
+  } = req.body;
+  try {
+    if (!proyecto_id || !totalSinIgv || !totalConIgv || !igv) {
+      return res
+        .status(400)
+        .json({ message: "Faltan campos obligatorios en la solicitud." });
+    }
+    const fechaOperacion = new Date();
+    const { correlativaNumero, correlativaVisible } = await generarCorrelativa(
+      fechaOperacion
+    );
+    const nuevaCotizacion = new Comercial_Cotizaciones({
+      correlativa: correlativaNumero,
+      correlativaVisible,
+      proyecto_id,
+      tipoDeServicio,
+      tiempoDeEntrega,
+      analisis,
+      gastosOperativos,
+      gastosAdministrativos,
+      gastosGenerales,
+      totalSinIgv,
+      totalConIgv,
+      igv,
+      estado,
+    });
+    await nuevaCotizacion.save();
+    return res.status(201).json(nuevaCotizacion);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = postCotizacion;

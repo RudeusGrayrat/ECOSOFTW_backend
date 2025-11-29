@@ -11,17 +11,6 @@ const router = Router();
 router.post("/login", login);
 // router.post("/logout", logout);
 
-// router.delete("/deleteSubmodule", deleteSubmodule);
-// router.delete("/deleteModule", deleteModule);
-// router.delete("/deletePermission", deletePermission);
-
-// router.patch("/updateModule", updateModule);
-// router.patch("/updateSubModule", updateSubModule);
-// router.patch("/updatePermission", updatePermission);
-
-// router.get("/getModules", getModules);
-// router.get("/getSubModules", getSubModules);
-// router.get("/getPermissions", getPermissions);
 router.get("/auth/verify", verifyToken);
 
 router.use("/comercial", comercialRouter);

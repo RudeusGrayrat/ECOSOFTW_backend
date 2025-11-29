@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const comercial_clienteSchema = mongoose.Schema(
   {
-    proyecto: { type: String },
     tipoCliente: {
       type: String,
       enum: ["EMPRESA", "PERSONA"],
@@ -10,6 +9,7 @@ const comercial_clienteSchema = mongoose.Schema(
     },
     rucEmpresa: { type: String },
     razonSocial: { type: String },
+    contacto: { type: String },
 
     dniCliente: { type: String },
     nombreCliente: { type: String },
@@ -17,10 +17,6 @@ const comercial_clienteSchema = mongoose.Schema(
     telefono: { type: String },
     correo: { type: String },
 
-    servicio: { type: String },
-    cantidadPuntosParametros: { type: Number },
-    lugarMuestreo: { type: String },
-    fechaServicio: { type: Date },
     direccionLegal: { type: String },
   },
   { timestamps: true }

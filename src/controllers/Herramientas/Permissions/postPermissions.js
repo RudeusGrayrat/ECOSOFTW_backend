@@ -6,11 +6,11 @@ const postPermissions = async (req, res) => {
     const newPermission = new Permissions({ name, description });
     await newPermission.save();
     return res.status(201).json({
-      message: "Permission created successfully",
+      message: "Permiso creado exitosamente",
       permission: newPermission,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Error del servidor", error });
   }
 };
 module.exports = postPermissions;
