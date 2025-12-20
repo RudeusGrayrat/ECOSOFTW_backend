@@ -1,3 +1,5 @@
+const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
+
 const postProyectos = async (req, res) => {
   const {
     cliente_id,
@@ -8,6 +10,7 @@ const postProyectos = async (req, res) => {
     lugarMuestreo,
     estado,
   } = req.body;
+  console.log(req.body);
   try {
     if (!cliente_id || !nombre || !servicio) {
       return res

@@ -22,8 +22,8 @@ const createSubmodule = async (req, res) => {
     const newSubmodule = new Submodule({ name, module });
 
     await newSubmodule.save();
-    return res.status(200).json({
-      message: "Submodulo creado correctamente",
+    return res.status(201).json({
+      message: `Submodulo '${name}' creado exitosamente en el modulo '${module}'`,
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });

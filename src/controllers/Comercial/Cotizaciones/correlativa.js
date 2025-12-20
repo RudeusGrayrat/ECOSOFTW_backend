@@ -7,36 +7,36 @@ const generarCorrelativa = async (fechaOperacion) => {
 
     // Buscar la última correlativa del año actual
     const ultima = await Comercial_Cotizaciones.findOne({
-      correlativaNumero: {
+      correlativa: {
         $gte: Number(`${correlativaBase}00001`),
         $lt: Number(`${correlativaBase}99999`),
       },
     })
-      .sort({ correlativaNumero: -1 })
+      .sort({ correlativa: -1 })
       .lean();
 
     let nuevoNumeroSecuencial = 1;
 
     if (ultima) {
       const secuencia = parseInt(
-        ultima.correlativaNumero.toString().slice(2), // obtiene solo la secuencia
+        ultima.correlativa.toString().slice(2), // obtiene solo la secuencia
         10
       );
 
       if (isNaN(secuencia)) {
-        throw new Error(`Secuencia inválida: ${ultima.correlativaNumero}`);
+        throw new Error(`Secuencia inválida: ${ultima.correlativa}`);
       }
 
       nuevoNumeroSecuencial = secuencia + 1;
     }
 
     // Construir correlativa numérica (para guardar en BD)
-    const correlativaNumero = Number(
+    const correlativa = Number(
       `${correlativaBase}${nuevoNumeroSecuencial.toString().padStart(5, "0")}`
     );
 
-    if (isNaN(correlativaNumero)) {
-      throw new Error(`Correlativa generada inválida: ${correlativaNumero}`);
+    if (isNaN(correlativa)) {
+      throw new Error(`Correlativa generada inválida: ${correlativa}`);
     }
 
     // Construir correlativa visible (string final)
@@ -45,7 +45,7 @@ const generarCorrelativa = async (fechaOperacion) => {
       .padStart(5, "0")}-CT CAC - VER08`;
 
     return {
-      correlativaNumero, // numérico (para la BD)
+      correlativa, // numérico (para la BD)
       correlativaVisible, // para mostrar en frontend
     };
   } catch (error) {

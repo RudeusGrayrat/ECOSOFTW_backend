@@ -12,7 +12,7 @@ const createModule = async (req, res) => {
     const newModule = new Module({ name });
     await newModule.save();
     return res.status(201).json({
-      message: "Modulo creado correctamente",
+      message: `Modulo '${name}' creado exitosamente`,
     });
   } catch (error) {
     console.log(error);

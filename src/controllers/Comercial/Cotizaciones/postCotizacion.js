@@ -22,11 +22,11 @@ const postCotizacion = async (req, res) => {
         .json({ message: "Faltan campos obligatorios en la solicitud." });
     }
     const fechaOperacion = new Date();
-    const { correlativaNumero, correlativaVisible } = await generarCorrelativa(
+    const { correlativa, correlativaVisible } = await generarCorrelativa(
       fechaOperacion
     );
     const nuevaCotizacion = new Comercial_Cotizaciones({
-      correlativa: correlativaNumero,
+      correlativa,
       correlativaVisible,
       proyecto_id,
       tipoDeServicio,
@@ -41,7 +41,10 @@ const postCotizacion = async (req, res) => {
       estado,
     });
     await nuevaCotizacion.save();
-    return res.status(201).json(nuevaCotizacion);
+    return res.status(201).json({
+      message: `Cotización ${correlativa} creada exitosamente.`,
+      data: nuevaCotizacion,
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

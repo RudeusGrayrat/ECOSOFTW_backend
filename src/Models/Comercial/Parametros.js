@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const comercial_ParametrosSchema = mongoose.Schema(
   {
     tipoDeAnalisis: { type: String, required: true },
-    categoria: { type: String },//solo para parametros de agua
+    categoria: { type: String },
     parametro: { type: String, required: true },
     metodo: { type: String, required: true },
     acreditadoPor: { type: String, default: "-" },

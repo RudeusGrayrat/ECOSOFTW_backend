@@ -2,7 +2,6 @@ const Comercial_TiposDeGastos = require("../../../Models/Comercial/TipoDeGastos"
 
 const postTiposDeGastos = async (req, res) => {
   const { tipoDeGasto, descripcion, precio } = req.body;
-  console.log("req.body", req.body);
   try {
     if (!tipoDeGasto || !descripcion || precio == null) {
       return res.status(400).json({

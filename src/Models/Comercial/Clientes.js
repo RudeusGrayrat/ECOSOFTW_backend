@@ -7,15 +7,12 @@ const comercial_clienteSchema = mongoose.Schema(
       enum: ["EMPRESA", "PERSONA"],
       required: true,
     },
-    rucEmpresa: { type: String },
-    razonSocial: { type: String },
-    contacto: { type: String },
-
-    dniCliente: { type: String },
-    nombreCliente: { type: String },
+    cliente: { type: String, required: true },
+    numeroDocumento: { type: String, required: true },
+    nombreContacto: { type: String },
 
     telefono: { type: String },
-    correo: { type: String },
+    correoElectronico: { type: String },
 
     direccionLegal: { type: String },
   },

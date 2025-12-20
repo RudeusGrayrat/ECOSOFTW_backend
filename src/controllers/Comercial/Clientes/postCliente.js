@@ -2,22 +2,36 @@ const Comercial_Clientes = require("../../../Models/Comercial/Clientes");
 
 const postCliente = async (req, res) => {
   const {
-    tipoDocumento,
+    tipoCliente,
+    cliente,
     numeroDocumento,
     nombreContacto,
-    proyecto,
     telefono,
-    correo,
-    servicio,
-    cantidadPuntosParametros,
-    lugarMuestreo,
-    fechaServicio,
+    correoElectronico,
     direccionLegal,
   } = req.body;
   try {
-    const cliente = new Comercial_Clientes(req.body);
-    await cliente.save();
-    res.status(201).json(cliente);
+    if (!tipoCliente || !cliente || !numeroDocumento || !telefono) {
+      return res.status(400).json({ message: "Faltan datos obligatorios para crear el cliente" });
+    }
+    const findCliente = await Comercial_Clientes.findOne({
+      cliente: cliente,
+      numeroDocumento: numeroDocumento,
+    });
+    if (findCliente) {
+      return res.status(409).json({ message: "El cliente con ese número de documento ya existe" });
+    }
+    const nuevoCliente = new Comercial_Clientes({
+      tipoCliente,
+      cliente,
+      numeroDocumento,
+      nombreContacto,
+      telefono,
+      correoElectronico,
+      direccionLegal,
+    })
+    await nuevoCliente.save();
+    res.status(201).json({ message: "Cliente creado exitosamente", data: nuevoCliente });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

@@ -6,7 +6,7 @@ const postPermissions = async (req, res) => {
     const newPermission = new Permissions({ name, description });
     await newPermission.save();
     return res.status(201).json({
-      message: "Permiso creado exitosamente",
+      message: `Permiso '${name}' creado exitosamente`,
       permission: newPermission,
     });
   } catch (error) {

@@ -1,11 +1,9 @@
+const { populate } = require("dotenv");
 const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
 const Comercial_Parametros = require("../../../Models/Comercial/Parametros");
 const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
 const Compercial_TipoDeGastos = require("../../../Models/Comercial/TipoDeGastos");
-
-const escapeRegExp = (string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-};
+const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getCotizacionesPagination = async (req, res) => {
   try {
@@ -59,6 +57,7 @@ const getCotizacionesPagination = async (req, res) => {
       Comercial_Cotizaciones.find(query)
         .skip(Number(page) * Number(limit))
         .limit(Number(limit))
+        .sort({ correlativa: -1 })
         .populate([
           {
             path: "gastosOperativos.tipoDeGasto_id",
@@ -70,7 +69,11 @@ const getCotizacionesPagination = async (req, res) => {
           },
           { path: "analisis.parametro_id", model: Comercial_Parametros },
           // proyecto populate: use the model name string if the model isn't imported above
-          { path: "proyecto_id", model: Comercial_Proyectos },
+          {
+            path: "proyecto_id", model: Comercial_Proyectos, populate: {
+              path: "cliente_id", model: "comercial_cliente"
+            }
+          },
         ]),
       Comercial_Cotizaciones.countDocuments(query),
     ]);
