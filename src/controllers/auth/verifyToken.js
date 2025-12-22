@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const User_Ecosoft = require("../../models/Herramientas/User");
+const UserEcosoft = require("../../models/Herramientas/User");
 const { JWT_SECRET } = process.env;
 
 const verifyToken = async (req, res) => {
@@ -13,7 +13,7 @@ const verifyToken = async (req, res) => {
           }
           return res.status(403).json({ message: "Token no válido" });
         }
-        const userFound = await User_Ecosoft.findById(user._id);
+        const userFound = await UserEcosoft.findById(user._id);
         if (!userFound) {
           return res
             .status(401)
