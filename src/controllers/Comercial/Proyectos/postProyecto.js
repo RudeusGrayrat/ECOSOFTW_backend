@@ -1,4 +1,4 @@
-const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
+const Comercial_Proyectos = require("../../../models/Comercial/Proyectos");
 
 const postProyectos = async (req, res) => {
   const {

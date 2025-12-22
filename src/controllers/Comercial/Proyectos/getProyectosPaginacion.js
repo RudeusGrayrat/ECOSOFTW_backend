@@ -1,5 +1,5 @@
-const Comercial_Cliente = require("../../../Models/Comercial/Clientes");
-const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
+const Comercial_Cliente = require("../../../models/Comercial/Clientes");
+const Comercial_Proyectos = require("../../../models/Comercial/Proyectos");
 
 const getProyectosPagination = async (req, res) => {
     try {

@@ -1,4 +1,4 @@
-const Comercial_Cliente = require("../../../Models/Comercial/Clientes");
+const Comercial_Cliente = require("../../../models/Comercial/Clientes");
 const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getClientesPaginacion = async (req, res) => {

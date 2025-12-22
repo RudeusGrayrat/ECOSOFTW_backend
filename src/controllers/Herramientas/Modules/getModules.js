@@ -1,4 +1,4 @@
-const Module = require("../../../Models/Herramientas/Modulo");
+const Module = require("../../../models/Herramientas/Modulo");
 
 const getModules = async (req, res) => {
   try {

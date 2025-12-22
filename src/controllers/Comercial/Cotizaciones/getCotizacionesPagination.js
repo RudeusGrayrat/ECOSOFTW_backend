@@ -1,8 +1,8 @@
 const { populate } = require("dotenv");
-const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
-const Comercial_Parametros = require("../../../Models/Comercial/Parametros");
-const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
-const Compercial_TipoDeGastos = require("../../../Models/Comercial/TipoDeGastos");
+const Comercial_Cotizaciones = require("../../../models/Comercial/Cotizaciones");
+const Comercial_Parametros = require("../../../models/Comercial/Parametros");
+const Comercial_Proyectos = require("../../../models/Comercial/Proyectos");
+const Compercial_TipoDeGastos = require("../../../models/Comercial/TipoDeGastos");
 const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getCotizacionesPagination = async (req, res) => {
