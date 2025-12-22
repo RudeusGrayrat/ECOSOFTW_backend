@@ -1,7 +1,7 @@
 const { Router } = require("express");
 
 const comercialRouter = require("./Modulos/Comercial");
-const verifyToken = require("../Controllers/auth/verifyToken");
+const verifyToken = require("../controllers/auth/verifyToken");
 const herramientasRouter = require("./Modulos/Herramientas");
 const login = require("../controllers/Herramientas/User/login");
 
