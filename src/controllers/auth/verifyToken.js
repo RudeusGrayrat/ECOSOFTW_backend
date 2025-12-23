@@ -29,6 +29,7 @@ const verifyToken = async (req, res) => {
       });
     }
   } catch (error) {
+    console.error("Error en verifyToken:", error);
     return res.status(500).json({ message: error.message });
   }
 };
