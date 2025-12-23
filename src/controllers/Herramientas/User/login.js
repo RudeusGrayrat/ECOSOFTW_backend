@@ -34,7 +34,6 @@ const login = async (req, res) => {
       token: token,
     });
   } catch (error) {
-    console.error("Error en login:", error);
     return res.status(500).json({ message: error.message });
   }
 };

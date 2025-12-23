@@ -10,7 +10,6 @@ const postProyectos = async (req, res) => {
     lugarMuestreo,
     estado,
   } = req.body;
-  console.log(req.body);
   try {
     if (!cliente_id || !nombre || !servicio) {
       return res

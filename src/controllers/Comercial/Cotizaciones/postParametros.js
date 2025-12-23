@@ -39,7 +39,6 @@ const postParametro = async (req, res) => {
       .status(201)
       .json({ message: "Parámetro creado exitosamente", newParametro });
   } catch (error) {
-    console.error("Error al crear el parámetro:", error);
     res
       .status(500)
       .json({ message: "Error al crear el parámetro", error: error.message });

@@ -15,8 +15,6 @@ const createModule = async (req, res) => {
       message: `Modulo '${name}' creado exitosamente`,
     });
   } catch (error) {
-    console.log(error);
-
     return res.status(500).json({ message: error.message });
   }
 };
