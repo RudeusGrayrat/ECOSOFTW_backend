@@ -10,6 +10,8 @@ const postTiposDeGastos = require("../../controllers/Comercial/Cotizaciones/post
 const getTiposDeGastosPaginacion = require("../../controllers/Comercial/Cotizaciones/getTiposDeGatosPaginacion");
 const getProyectosPagination = require("../../controllers/Comercial/Proyectos/getProyectosPaginacion");
 const postFormularioCotizacion = require("../../controllers/Comercial/Cotizaciones/postFormularioCotizacion");
+const patchCliente = require("../../controllers/Comercial/Clientes/patchCliente");
+const patchCotizacion = require("../../controllers/Comercial/Cotizaciones/patchCotizacion");
 
 const comercialRouter = Router();
 
@@ -18,6 +20,9 @@ comercialRouter.get("/getProyectosPaginacion", getProyectosPagination);
 comercialRouter.get("/getCotizacionesPaginacion", getCotizacionesPagination);
 comercialRouter.get("/getParametrosPaginacion", getParametrosPagination);
 comercialRouter.get("/getTiposDeGastosPaginacion", getTiposDeGastosPaginacion);
+
+comercialRouter.patch("/patchCliente/:id", patchCliente);
+comercialRouter.patch("/patchCotizacion/:id", patchCotizacion);
 
 comercialRouter.post("/postCliente", postCliente);
 comercialRouter.post("/postCotizacion", postCotizacion);
