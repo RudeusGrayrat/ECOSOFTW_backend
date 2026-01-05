@@ -32,6 +32,7 @@ const getProyectosPagination = async (req, res) => {
             Comercial_Proyectos.find(query)
                 .skip(Number(page) * Number(limit))
                 .limit(Number(limit))
+                .sort({ createdAt: -1 })
                 .populate("cliente_id"),
             Comercial_Proyectos.countDocuments(query),
         ]);

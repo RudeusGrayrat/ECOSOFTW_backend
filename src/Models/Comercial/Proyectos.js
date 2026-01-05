@@ -21,4 +21,5 @@ const Comercial_Proyectos = mongoose.model(
   "comercial_proyectos",
   comercial_proyectosSchema
 );
+
 module.exports = Comercial_Proyectos;
