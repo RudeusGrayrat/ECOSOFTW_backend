@@ -10,7 +10,7 @@ const userEcosoftSchema = mongoose.Schema(
     colaborador: {
       type: String
     },
-    email: {
+    correoElectronico: {
       type: String,
     },
     puesto: {

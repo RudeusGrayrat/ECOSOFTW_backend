@@ -39,7 +39,7 @@ const patchCotizacion = async (req, res) => {
         const updatedCotizacion = await findCotizacion.save();
 
         res.status(200).json({
-            message: "Cotización actualizada exitosamente", data: updatedCotizacion,
+            message: "Cotización actualizada exitosamente", data: updatedCotizacion, type: "Correcto"
         });
     } catch (error) {
         return res.status(500).json({ message: error.message });

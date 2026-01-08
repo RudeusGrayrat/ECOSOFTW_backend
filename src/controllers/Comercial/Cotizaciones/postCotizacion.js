@@ -17,6 +17,7 @@ const postCotizacion = async (req, res) => {
     creadoPor,
   } = req.body;
   try {
+    console.log(req.body);
     if (!proyecto_id || !totalSinIgv || !totalConIgv || !igv || !creadoPor) {
       return res
         .status(400)
@@ -40,7 +41,7 @@ const postCotizacion = async (req, res) => {
       totalConIgv,
       igv,
       estado,
-      creadorPor: creadoPor,
+      creadoPor
     });
     await nuevaCotizacion.save();
     return res.status(201).json({

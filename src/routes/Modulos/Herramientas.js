@@ -4,6 +4,7 @@ const createSubmodule = require("../../controllers/Herramientas/SubModules/creat
 const postPermissions = require("../../controllers/Herramientas/Permissions/postPermissions");
 const postUsuariosEcosoft = require("../../controllers/Herramientas/User/postUser");
 const EliminarDocumento = require("../../controllers/Comercial/Cotizaciones/eliminarDocumento");
+const PatchUser = require("../../controllers/Herramientas/User/pacthUser");
 
 const herramientasRouter = Router();
 
@@ -11,6 +12,8 @@ herramientasRouter.post("/postUsuariosEcosoft", postUsuariosEcosoft);
 herramientasRouter.post("/postModule", createModule);
 herramientasRouter.post("/postSubModule", createSubmodule);
 herramientasRouter.post("/postPermission", postPermissions);
+
+herramientasRouter.patch("/patchUser/:id", PatchUser)
 
 herramientasRouter.delete("/deleteDocumentCloudinary", EliminarDocumento);
 
