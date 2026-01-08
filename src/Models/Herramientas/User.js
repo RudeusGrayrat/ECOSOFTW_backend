@@ -7,6 +7,18 @@ const userEcosoftSchema = mongoose.Schema(
       required: true,
       unique: true,
     },
+    colaborador: {
+      type: String
+    },
+    email: {
+      type: String,
+    },
+    puesto: {
+      type: String,
+    },
+    telefono: {
+      type: String,
+    },
     password: {
       type: String,
       required: true,

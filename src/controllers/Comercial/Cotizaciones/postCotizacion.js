@@ -14,12 +14,13 @@ const postCotizacion = async (req, res) => {
     totalConIgv,
     igv,
     estado,
+    creadoPor,
   } = req.body;
   try {
-    if (!proyecto_id || !totalSinIgv || !totalConIgv || !igv) {
+    if (!proyecto_id || !totalSinIgv || !totalConIgv || !igv || !creadoPor) {
       return res
         .status(400)
-        .json({ message: "Faltan campos obligatorios en la solicitud." });
+        .json({ message: "Faltan campos obligatorios en la solicitud.", type: "Aviso" });
     }
     const fechaOperacion = new Date();
     const { correlativa, correlativaVisible } = await generarCorrelativa(
@@ -39,11 +40,13 @@ const postCotizacion = async (req, res) => {
       totalConIgv,
       igv,
       estado,
+      creadorPor: creadoPor,
     });
     await nuevaCotizacion.save();
     return res.status(201).json({
       message: `Cotización ${correlativa} creada exitosamente.`,
       data: nuevaCotizacion,
+      type: "Correcto",
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });

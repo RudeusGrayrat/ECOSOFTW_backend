@@ -14,6 +14,7 @@ const patchCotizacion = async (req, res) => {
         totalConIgv,
         igv,
         estado,
+        actualizadoPor,
     } = req.body;
     console.log(req.body);
     console.log(_id);
@@ -33,6 +34,7 @@ const patchCotizacion = async (req, res) => {
         if (totalConIgv) findCotizacion.totalConIgv = totalConIgv;
         if (igv) findCotizacion.igv = igv;
         if (estado) findCotizacion.estado = estado;
+        if (actualizadoPor) findCotizacion.actualizadoPor = actualizadoPor;
 
         const updatedCotizacion = await findCotizacion.save();
 

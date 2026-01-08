@@ -64,6 +64,14 @@ const getCotizacionesPagination = async (req, res) => {
             model: Compercial_TipoDeGastos,
           },
           {
+            path: "creadorPor",
+            model: "UserEcosoft",
+          },
+          {
+            path: "actualizadoPor",
+            model: "UserEcosoft",
+          },
+          {
             path: "gastosAdministrativos.tipoDeGasto_id",
             model: Compercial_TipoDeGastos,
           },

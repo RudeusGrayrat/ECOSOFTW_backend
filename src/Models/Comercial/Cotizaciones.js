@@ -60,6 +60,15 @@ const comercial_cotizacionesSchema = mongoose.Schema(
       enum: ["PENDIENTE", "APROBADO", "ANULADO"],
       default: "PENDIENTE",
     },
+    creadorPor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "UserEcosoft",
+      required: true,
+    },
+    actualizadoPor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "UserEcosoft",
+    },
   },
   { timestamps: true }
 );
