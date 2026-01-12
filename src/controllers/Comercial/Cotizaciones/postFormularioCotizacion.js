@@ -20,7 +20,7 @@ const postFormularioCotizacion = async (req, res) => {
     try {
         //verificacion de datos
         if (!tipoCliente || !cliente || !numeroDocumento || !servicio || !proyecto) {
-            return res.status(400).json({ message: "Faltan datos obligatorios." });
+            return res.status(400).json({ message: "Faltan datos obligatorios.", type: "Advertencia" });
         }
 
         //aquí se buscaraá al cliente, si existe se asociará al proyecto, si no, se creará un nuevo cliente
@@ -55,7 +55,7 @@ const postFormularioCotizacion = async (req, res) => {
         await newProyecto.save();
 
 
-        return res.status(201).json({ message: "Recibimos sus datos, nos comunicaremos lo mas pronto posible." });
+        return res.status(201).json({ message: "Recibimos sus datos, nos comunicaremos lo mas pronto posible.", type: "Correcto" });
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
