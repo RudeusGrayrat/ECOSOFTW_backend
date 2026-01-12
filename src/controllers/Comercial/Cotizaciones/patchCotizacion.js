@@ -16,8 +16,6 @@ const patchCotizacion = async (req, res) => {
         estado,
         actualizadoPor,
     } = req.body;
-    console.log(req.body);
-    console.log(_id);
     try {
         const findCotizacion = await Comercial_Cotizaciones.findById(_id);
         if (!findCotizacion) {

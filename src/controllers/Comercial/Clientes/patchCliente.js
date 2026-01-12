@@ -16,7 +16,7 @@ const patchCliente = async (req, res) => {
     try {
         const findCliente = await Comercial_Cliente.findById(id)
         if (!findCliente) {
-            return res.status(404).json({ message: "Cliente no encontrado" });
+            return res.status(404).json({ message: "Cliente no encontrado", type: "Error" });
         }
 
         if (tipoCliente) findCliente.tipoCliente = tipoCliente;
