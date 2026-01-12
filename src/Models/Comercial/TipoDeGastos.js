@@ -16,8 +16,9 @@ const comercial_tipos_de_gastosSchema = mongoose.Schema(
     },
     estado: {
       type: String,
-      default: "ACTIVO",
       enum: ["ACTIVO", "INACTIVO"],
+      default: "ACTIVO",
+      required: true,
     },
   },
   { timestamps: true }
