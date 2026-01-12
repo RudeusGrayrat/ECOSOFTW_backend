@@ -15,7 +15,11 @@ const comercial_clienteSchema = mongoose.Schema(
     correoElectronico: { type: String },
 
     direccionLegal: { type: String },
-    estado: { type: String, enum: ["ACTIVO", "INACTIVO"], default: "ACTIVO" },
+    estado: {
+      type: String,
+      enum: ["ACTIVO", "INACTIVO"],
+      default: "ACTIVO"
+    },
   },
   { timestamps: true }
 );
