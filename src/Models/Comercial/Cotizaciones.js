@@ -55,11 +55,7 @@ const comercial_cotizacionesSchema = mongoose.Schema(
     totalSinIgv: { type: Number },
     totalConIgv: { type: Number },
     igv: { type: Number },
-    estado: {
-      type: String,
-      enum: ["PENDIENTE", "APROBADO", "ANULADO"],
-      default: "PENDIENTE",
-    },
+    estado: { type: String, enum: ["ACTIVO", "INACTIVO"], default: "ACTIVO" },
     creadoPor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "UserEcosoft",
