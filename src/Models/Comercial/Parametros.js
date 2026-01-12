@@ -10,7 +10,6 @@ const comercial_ParametrosSchema = mongoose.Schema(
     tipoDeAcreditacion: { type: String, default: "-" },
     limiteDeCuantificacionDelMetodo: {
       type: String,
-      required: true,
       default: "-",
     },
     limiteDeDeteccionDelMetodo: { type: String, default: "-" },
