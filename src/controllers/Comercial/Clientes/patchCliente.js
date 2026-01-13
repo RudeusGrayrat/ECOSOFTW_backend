@@ -1,4 +1,4 @@
-const Comercial_Cliente = require("../../../models/Comercial/Clientes");
+const Comercial_Clientes = require("../../../models/Comercial/Clientes");
 
 const patchCliente = async (req, res) => {
     const { id } = req.params;
@@ -14,7 +14,7 @@ const patchCliente = async (req, res) => {
     } = req.body;
 
     try {
-        const findCliente = await Comercial_Cliente.findById(id)
+        const findCliente = await Comercial_Clientes.findById(id)
         if (!findCliente) {
             return res.status(404).json({ message: "Cliente no encontrado", type: "Error" });
         }

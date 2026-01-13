@@ -79,7 +79,7 @@ const getCotizacionesPagination = async (req, res) => {
           // proyecto populate: use the model name string if the model isn't imported above
           {
             path: "proyecto_id", model: Comercial_Proyectos, populate: {
-              path: "cliente_id", model: "comercial_cliente"
+              path: "cliente_id", model: "comercial_clientes"
             }
           },
         ]),

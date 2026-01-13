@@ -4,7 +4,7 @@ const comercial_proyectosSchema = mongoose.Schema(
   {
     cliente_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "comercial_cliente",
+      ref: "comercial_clientes",
       required: true,
     },
     nombre: { type: String, required: true },
@@ -12,7 +12,7 @@ const comercial_proyectosSchema = mongoose.Schema(
     fechaServicio: { type: String },
     cantidadPuntosParametros: { type: Number },
     lugarMuestreo: { type: String },
-    estado: { type: String, enum: ["ACTIVO", "INACTIVO"], default: "ACTIVO" },
+    estado: { type: String, enum: ["ACTIVO", "INACTIVO"], default: "ACTIVO" , required: true},
   },
   { timestamps: true }
 );

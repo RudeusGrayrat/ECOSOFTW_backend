@@ -1,4 +1,4 @@
-const Comercial_Cliente = require("../../../models/Comercial/Clientes");
+const Comercial_Clientes = require("../../../models/Comercial/Clientes");
 const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getClientesPaginacion = async (req, res) => {
@@ -18,11 +18,11 @@ const getClientesPaginacion = async (req, res) => {
       ];
     }
     const [data, total] = await Promise.all([
-      Comercial_Cliente.find(query)
+      Comercial_Clientes.find(query)
         .skip(Number(page) * Number(limit))
         .limit(Number(limit))
         .sort({ createdAt: -1 }),
-      Comercial_Cliente.countDocuments(query),
+      Comercial_Clientes.countDocuments(query),
     ]);
     res.json({ data, total });
   } catch (error) {

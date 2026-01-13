@@ -1,4 +1,4 @@
-const Comercial_Cliente = require("../../../models/Comercial/Clientes");
+const Comercial_Clientes = require("../../../models/Comercial/Clientes");
 const Comercial_Proyectos = require("../../../models/Comercial/Proyectos");
 
 const postFormularioCotizacion = async (req, res) => {
@@ -24,10 +24,10 @@ const postFormularioCotizacion = async (req, res) => {
         }
 
         //aquí se buscaraá al cliente, si existe se asociará al proyecto, si no, se creará un nuevo cliente
-        const findCliente = await Comercial_Cliente.findOne({ numeroDocumento: numeroDocumento });
+        const findCliente = await Comercial_Clientes.findOne({ numeroDocumento: numeroDocumento });
         let clienteId;
         if (!findCliente) {
-            const newCliente = new Comercial_Cliente({
+            const newCliente = new Comercial_Clientes({
                 tipoCliente,
                 cliente,
                 numeroDocumento,

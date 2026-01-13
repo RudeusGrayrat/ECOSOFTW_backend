@@ -1,4 +1,4 @@
-const Comercial_Cliente = require("../../../models/Comercial/Clientes");
+const Comercial_Clientes = require("../../../models/Comercial/Clientes");
 const Comercial_Proyectos = require("../../../models/Comercial/Proyectos");
 
 const getProyectosPagination = async (req, res) => {
@@ -8,7 +8,7 @@ const getProyectosPagination = async (req, res) => {
         if (search) {
             const escapedSearch = escapeRegExp(search);
             const regex = new RegExp(escapedSearch, "i");
-            const clientes = await Comercial_Cliente.find({
+            const clientes = await Comercial_Clientes.find({
                 $or: [{ cliente: regex }, { numeroDocumento: regex }, { nombreContacto: regex }],
             }).select("_id");
             const clienteIds = clientes.map((cli) => cli._id);

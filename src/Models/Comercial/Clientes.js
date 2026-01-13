@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const comercial_clienteSchema = mongoose.Schema(
+const comercial_clientesSchema = mongoose.Schema(
   {
     tipoCliente: {
       type: String,
@@ -24,9 +24,9 @@ const comercial_clienteSchema = mongoose.Schema(
   { timestamps: true }
 );
 
-const Comercial_Cliente = mongoose.model(
-  "comercial_cliente",
-  comercial_clienteSchema
+const Comercial_Clientes = mongoose.model(
+  "comercial_clientes",
+  comercial_clientesSchema
 );
 
-module.exports = Comercial_Cliente;
+module.exports = Comercial_Clientes;
