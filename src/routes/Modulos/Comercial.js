@@ -1,5 +1,4 @@
 const { Router } = require("express");
-const getClientesPaginacion = require("../../controllers/Comercial/Clientes/getClientesPaginacion");
 const postCliente = require("../../controllers/Comercial/Clientes/postCliente");
 const getCotizacionesPagination = require("../../controllers/Comercial/Cotizaciones/getCotizacionesPagination");
 const postCotizacion = require("../../controllers/Comercial/Cotizaciones/postCotizacion");
@@ -15,6 +14,7 @@ const patchCotizacion = require("../../controllers/Comercial/Cotizaciones/patchC
 const patchTipoDeGasto = require("../../controllers/Comercial/TiposDeGastos/patchTipoDeGasto");
 const patchProyecto = require("../../controllers/Comercial/Proyectos/patchProyecto");
 const patchParametro = require("../../controllers/Comercial/Parametros/patchParametros");
+const getClientesPaginacion = require("../../controllers/Comercial/Clientes/getClientesPaginacion");
 
 const comercialRouter = Router();
 

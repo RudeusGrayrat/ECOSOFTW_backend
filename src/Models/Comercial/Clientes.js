@@ -13,14 +13,14 @@ const comercial_clientesSchema = mongoose.Schema(
 
         telefono: { type: String },
         correoElectronico: { type: String },
-
-        direccionLegal: { type: String },
         estado: {
             type: String,
             enum: ["ACTIVO", "INACTIVO"],
             default: "ACTIVO",
             required: true,
         },
+
+        direccionLegal: { type: String },
     },
     { timestamps: true }
 );
