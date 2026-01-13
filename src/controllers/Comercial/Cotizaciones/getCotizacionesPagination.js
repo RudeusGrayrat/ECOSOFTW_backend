@@ -1,4 +1,3 @@
-const { populate } = require("dotenv");
 const Comercial_Cotizaciones = require("../../../models/Comercial/Cotizaciones");
 const Comercial_Parametros = require("../../../models/Comercial/Parametros");
 const Comercial_Proyectos = require("../../../models/Comercial/Proyectos");

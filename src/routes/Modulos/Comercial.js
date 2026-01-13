@@ -1,20 +1,22 @@
 const { Router } = require("express");
+
+const getClientesPaginacion = require("../../controllers/Comercial/Clientes/getClientesPaginacion");
 const postCliente = require("../../controllers/Comercial/Clientes/postCliente");
-const getCotizacionesPagination = require("../../controllers/Comercial/Cotizaciones/getCotizacionesPagination");
-const postCotizacion = require("../../controllers/Comercial/Cotizaciones/postCotizacion");
-const postProyectos = require("../../controllers/Comercial/Proyectos/postProyecto");
-const postParametro = require("../../controllers/Comercial/Cotizaciones/postParametros");
-const getParametrosPagination = require("../../controllers/Comercial/Cotizaciones/getParametrosPagination");
-const postTiposDeGastos = require("../../controllers/Comercial/Cotizaciones/postTipoDeGastos");
-const getTiposDeGastosPaginacion = require("../../controllers/Comercial/Cotizaciones/getTiposDeGatosPaginacion");
 const getProyectosPagination = require("../../controllers/Comercial/Proyectos/getProyectosPaginacion");
-const postFormularioCotizacion = require("../../controllers/Comercial/Cotizaciones/postFormularioCotizacion");
+const getCotizacionesPagination = require("../../controllers/Comercial/Cotizaciones/getCotizacionesPagination");
+const getParametrosPagination = require("../../controllers/Comercial/Cotizaciones/getParametrosPagination");
+const getTiposDeGastosPaginacion = require("../../controllers/Comercial/Cotizaciones/getTiposDeGatosPaginacion");
 const patchCliente = require("../../controllers/Comercial/Clientes/patchCliente");
 const patchCotizacion = require("../../controllers/Comercial/Cotizaciones/patchCotizacion");
-const patchTipoDeGasto = require("../../controllers/Comercial/TiposDeGastos/patchTipoDeGasto");
 const patchProyecto = require("../../controllers/Comercial/Proyectos/patchProyecto");
 const patchParametro = require("../../controllers/Comercial/Parametros/patchParametros");
-const getClientesPaginacion = require("../../controllers/Comercial/Clientes/getClientesPaginacion");
+const patchTipoDeGasto = require("../../controllers/Comercial/TiposDeGastos/patchTipoDeGasto");
+const postProyectos = require("../../controllers/Comercial/Proyectos/postProyecto");
+const postTiposDeGastos = require("../../controllers/Comercial/Cotizaciones/postTipoDeGastos");
+const postParametro = require("../../controllers/Comercial/Cotizaciones/postParametros");
+const postFormularioCotizacion = require("../../controllers/Comercial/Cotizaciones/postFormularioCotizacion");
+const postCotizacion = require("../../controllers/Comercial/Cotizaciones/postCotizacion");
+
 
 const comercialRouter = Router();
 
