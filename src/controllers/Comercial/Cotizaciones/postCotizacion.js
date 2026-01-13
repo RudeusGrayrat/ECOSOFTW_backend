@@ -1,4 +1,4 @@
-const Comercial_Cotizaciones = require("../../../models/Comercial/Cotizaciones");
+const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
 const generarCorrelativa = require("./correlativa");
 
 const postCotizacion = async (req, res) => {

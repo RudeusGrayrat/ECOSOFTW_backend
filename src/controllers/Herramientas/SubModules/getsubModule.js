@@ -1,4 +1,4 @@
-const Submodule = require("../../models/SubModule");
+const Submodule = require("../../Models/SubModule");
 
 const getSubModules = async (req, res) => {
   try {

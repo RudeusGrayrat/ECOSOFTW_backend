@@ -1,4 +1,4 @@
-const Comercial_Clientes = require("../../../models/Comercial/Clientes");
+const Comercial_Clientes = require("../../../Models/Comercial/Clientes");
 
 const patchCliente = async (req, res) => {
     const { id } = req.params;

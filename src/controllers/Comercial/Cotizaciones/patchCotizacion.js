@@ -1,4 +1,4 @@
-const Comercial_Cotizaciones = require("../../../models/Comercial/Cotizaciones");
+const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
 
 const patchCotizacion = async (req, res) => {
     const { id: _id } = req.params;

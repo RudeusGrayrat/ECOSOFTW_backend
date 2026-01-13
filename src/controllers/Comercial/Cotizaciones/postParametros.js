@@ -1,4 +1,4 @@
-const Comercial_Parametros = require("../../../models/Comercial/Parametros");
+const Comercial_Parametros = require("../../../Models/Comercial/Parametros");
 
 const postParametro = async (req, res) => {
   const {

@@ -1,5 +1,5 @@
 const { compare } = require("bcrypt");
-const UserEcosoft = require("../../../models/Herramientas/User");
+const UserEcosoft = require("../../../Models/Herramientas/User");
 const generatetoken = require("../../auth/jwt");
 
 const login = async (req, res) => {

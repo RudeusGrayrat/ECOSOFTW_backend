@@ -1,4 +1,4 @@
-const Module = require("../../../models/Herramientas/Modulo");
+const Module = require("../../../Models/Herramientas/Modulo");
 
 const deleteModule = async (req, res) => {
   const { id } = req.params;

@@ -1,5 +1,5 @@
-const Module = require("../../../models/Herramientas/Modulo");
-const Submodule = require("../../../models/Herramientas/Submodulo");
+const Module = require("../../../Models/Herramientas/Modulo");
+const Submodule = require("../../../Models/Herramientas/Submodulo");
 
 const createSubmodule = async (req, res) => {
   const { name, module } = req.body;

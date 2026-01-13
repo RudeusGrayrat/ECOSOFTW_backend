@@ -1,4 +1,4 @@
-const Comercial_Parametros = require("../../../models/Comercial/Parametros");
+const Comercial_Parametros = require("../../../Models/Comercial/Parametros");
 
 const patchParametro = async (req, res) => {
     const { id } = req.params;

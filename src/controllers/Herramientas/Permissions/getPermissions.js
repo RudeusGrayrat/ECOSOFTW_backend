@@ -1,4 +1,4 @@
-const Permissions = require("../../../models/Herramientas/Permission");
+const Permissions = require("../../../Models/Herramientas/Permission");
 
 const getPermissions = async (req, res) => {
     try {

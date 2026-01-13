@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const UserEcosoft = require("../../models/Herramientas/User");
+const UserEcosoft = require("../../Models/Herramientas/User");
 const { JWT_SECRET } = process.env;
 
 // Rutas públicas que NO necesitan token

@@ -1,4 +1,4 @@
-const Comercial_TiposDeGastos = require("../../../models/Comercial/TipoDeGastos");
+const Comercial_TiposDeGastos = require("../../../Models/Comercial/TipoDeGastos");
 
 const postTiposDeGastos = async (req, res) => {
   const { tipoDeGasto, descripcion, precio } = req.body;

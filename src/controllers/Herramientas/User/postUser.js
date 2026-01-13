@@ -1,4 +1,4 @@
-const UserEcosoft = require("../../../models/Herramientas/User");
+const UserEcosoft = require("../../../Models/Herramientas/User");
 const { hashPassword } = require("../../auth/bcrypt");
 
 const postUsuariosEcosoft = async (req, res) => {

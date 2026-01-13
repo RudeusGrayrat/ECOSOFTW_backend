@@ -1,4 +1,4 @@
-const UserEcosoft = require("../../../models/Herramientas/User");
+const UserEcosoft = require("../../../Models/Herramientas/User");
 
 const PatchUser = async (req, res) => {
     const { id } = req.params;

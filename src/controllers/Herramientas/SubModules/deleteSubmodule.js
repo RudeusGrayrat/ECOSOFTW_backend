@@ -1,4 +1,4 @@
-const Submodule = require("../../models/SubModule");
+const Submodule = require("../../Models/SubModule");
 
 const deleteSubmodule = async (req, res) => {
   const { _id } = req.body;

@@ -1,4 +1,4 @@
-const Comercial_TiposDeGastos = require("../../../models/Comercial/TipoDeGastos");
+const Comercial_TiposDeGastos = require("../../../Models/Comercial/TipoDeGastos");
 const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getTiposDeGastosPaginacion = async (req, res) => {
