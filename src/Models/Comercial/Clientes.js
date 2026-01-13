@@ -18,7 +18,8 @@ const comercial_clientesSchema = mongoose.Schema(
     estado: {
       type: String,
       enum: ["ACTIVO", "INACTIVO"],
-      default: "ACTIVO"
+      default: "ACTIVO",
+      required: true,
     },
   },
   { timestamps: true }

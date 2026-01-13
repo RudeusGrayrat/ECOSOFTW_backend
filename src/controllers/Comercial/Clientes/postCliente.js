@@ -1,4 +1,4 @@
-const Comercial_Clientess = require("../../../models/Comercial/Clientes");
+const Comercial_Clientes = require("../../../models/Comercial/Clientes");
 
 const postCliente = async (req, res) => {
   const {
@@ -14,14 +14,14 @@ const postCliente = async (req, res) => {
     if (!tipoCliente || !cliente || !numeroDocumento || !telefono) {
       return res.status(400).json({ message: "Faltan datos obligatorios para crear el cliente" });
     }
-    const findCliente = await Comercial_Clientess.findOne({
+    const findCliente = await Comercial_Clientes.findOne({
       cliente: cliente,
       numeroDocumento: numeroDocumento,
     });
     if (findCliente) {
       return res.status(409).json({ message: "El cliente con ese número de documento ya existe" });
     }
-    const nuevoCliente = new Comercial_Clientess({
+    const nuevoCliente = new Comercial_Clientes({
       tipoCliente,
       cliente,
       numeroDocumento,
