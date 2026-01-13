@@ -35,6 +35,7 @@ const postFormularioCotizacion = async (req, res) => {
                 telefono,
                 correoElectronico,
                 direccionLegal,
+                estado: "ACTIVO",
             });
             await newCliente.save();
             clienteId = newCliente._id;
