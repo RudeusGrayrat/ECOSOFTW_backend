@@ -12,7 +12,7 @@ const comercial_proyectosSchema = mongoose.Schema(
     fechaServicio: { type: String },
     cantidadPuntosParametros: { type: Number },
     lugarMuestreo: { type: String },
-    estado: { type: String, enum: ["ACTIVO", "INACTIVO"], default: "ACTIVO" , required: true},
+    estado: { type: String, enum: ["ACTIVO", "INACTIVO", "PENDIENTE"], default: "PENDIENTE" , required: true},
   },
   { timestamps: true }
 );

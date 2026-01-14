@@ -23,7 +23,7 @@ const postProyectos = async (req, res) => {
       fechaServicio,
       cantidadPuntosParametros,
       lugarMuestreo,
-      estado,
+      estado: "PENDIENTE",
     });
     await nuevoProyecto.save();
 
