@@ -16,6 +16,7 @@ const postTiposDeGastos = require("../../controllers/Comercial/Cotizaciones/post
 const postParametro = require("../../controllers/Comercial/Cotizaciones/postParametros");
 const postFormularioCotizacion = require("../../controllers/Comercial/Cotizaciones/postFormularioCotizacion");
 const postCotizacion = require("../../controllers/Comercial/Cotizaciones/postCotizacion");
+const deleteProyecto = require("../../controllers/Comercial/Proyectos/delete");
 
 
 const comercialRouter = Router();
@@ -38,5 +39,7 @@ comercialRouter.post("/postFormularioCotizacion", postFormularioCotizacion);
 comercialRouter.post("/postProyecto", postProyectos);
 comercialRouter.post("/postParametro", postParametro);
 comercialRouter.post("/postTiposDeGastos", postTiposDeGastos);
+
+comercialRouter.delete("/deleteProyecto/:id", deleteProyecto);
 
 module.exports = comercialRouter;
