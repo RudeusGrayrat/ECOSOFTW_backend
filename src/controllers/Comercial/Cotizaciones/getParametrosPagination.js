@@ -3,7 +3,7 @@ const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getParametrosPagination = async (req, res) => {
   try {
-    const { limit = 10, page = 0, search = "" } = req.query;
+    const { limit = 10, page = 0, search = "", tipoDeAnalisis } = req.query;
     const query = {};
     if (search) {
       const safeSearch = escapeRegExp(search);
@@ -15,6 +15,10 @@ const getParametrosPagination = async (req, res) => {
         { categoria: regex },
       ];
     }
+    if (tipoDeAnalisis) {
+      query.tipoDeAnalisis = tipoDeAnalisis;
+      console.log("Query con tipoDeAnalisis:", query);
+    }
     const [data, total] = await Promise.all([
       Comercial_Parametros.find(query)
         .skip(Number(page) * Number(limit))
@@ -23,6 +27,7 @@ const getParametrosPagination = async (req, res) => {
         .sort({ createdAt: -1 }),
       Comercial_Parametros.countDocuments(query),
     ]);
+    console.log("Data obtenida:", data);
     return res.status(200).json({ data, total });
   } catch (error) {
     return res.status(500).json({ message: error.message });
