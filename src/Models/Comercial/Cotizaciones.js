@@ -57,8 +57,7 @@ const comercial_cotizacionesSchema = mongoose.Schema(
     igv: { type: Number },
     estado: {
       type: String,
-      enum: ["ACTIVO", "INACTIVO"],
-      default: "ACTIVO",
+      enum: ["PENDIENTE", "APROBADO", "ANULADO"],
       required: true
     },
     creadoPor: {
