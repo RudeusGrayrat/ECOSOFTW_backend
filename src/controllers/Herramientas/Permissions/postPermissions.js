@@ -3,14 +3,19 @@ const Permissions = require("../../../Models/Herramientas/Permission");
 const postPermissions = async (req, res) => {
   const { name, description } = req.body;
   try {
-    const existingPermission = await Permissions.findOne({ name });
-    if (existingPermission) {
-      return res.status(400).json({ message: `El permiso '${name}' ya existe` });
+    if (!name) {
+      return res.status(400).json({ message: "Faltan datos obligatorios para crear el permiso" });
     }
-    const newPermission = new Permissions({ name, description });
+
+    const permissionName = name.trim().toUpperCase();
+    const existingPermission = await Permissions.findOne({ name: permissionName });
+    if (existingPermission) {
+      return res.status(409).json({ message: `El permiso '${permissionName}' ya existe` });
+    }
+    const newPermission = new Permissions({ name: permissionName, description });
     await newPermission.save();
     return res.status(201).json({
-      message: `Permiso '${name}' creado exitosamente`,
+      message: `Permiso '${permissionName}' creado exitosamente`,
       permission: newPermission,
     });
   } catch (error) {

@@ -1,8 +1,9 @@
 const UserEcosoft = require("../../../Models/Herramientas/User");
+const { hashPassword } = require("../../auth/bcrypt");
 
 const PatchUser = async (req, res) => {
     const { id } = req.params;
-    const { userName, password, photo, modules, correoElectronico, colaborador, telefono, puesto } = req.body;
+    const { userName, password, photo, modules, correoElectronico, colaborador, telefono, puesto, estado } = req.body;
 
     try {
         if (!id) {
@@ -13,13 +14,14 @@ const PatchUser = async (req, res) => {
             return res.status(404).json({ message: "Usuario no encontrado" });
         }
         if (userName) findUser.userName = userName;
-        if (password) findUser.password = password;
+        if (password) findUser.password = await hashPassword(password);
         if (photo) findUser.photo = photo;
         if (Array.isArray(modules)) findUser.modules = modules;
         if (correoElectronico) findUser.correoElectronico = correoElectronico;
         if (colaborador) findUser.colaborador = colaborador;
         if (telefono) findUser.telefono = telefono;
         if (puesto) findUser.puesto = puesto;
+        if (estado) findUser.estado = estado;
 
         const updatedUser = await findUser.save();
         return res.status(200).json({ message: "Usuario actualizado exitosamente", data: updatedUser, type: "Correcto" });

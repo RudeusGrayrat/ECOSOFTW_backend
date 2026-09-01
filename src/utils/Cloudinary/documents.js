@@ -19,6 +19,21 @@ const uploadDocument = (fileBuffer, fileName) => {
   });
 };
 
+const uploadPrivateDocument = (fileBuffer, fileName) => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: "home/ECOSOFT/INFORMES",
+        resource_type: "raw",
+        type: "authenticated",
+        public_id: fileName,
+      },
+      (error, result) => (error ? reject(error) : resolve(result))
+    );
+    uploadStream.end(fileBuffer);
+  });
+};
+
 const deleteDocument = async (publicId) => {
   try {
     const result = await cloudinary.uploader.destroy(publicId, {
@@ -59,4 +74,4 @@ const uploadTemporaryDocument = (fileBuffer, fileName) => {
   });
 };
 
-module.exports = { uploadDocument, deleteDocument, uploadTemporaryDocument };
+module.exports = { uploadDocument, uploadPrivateDocument, deleteDocument, uploadTemporaryDocument };

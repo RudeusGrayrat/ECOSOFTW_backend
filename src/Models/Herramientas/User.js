@@ -26,17 +26,23 @@ const userEcosoftSchema = mongoose.Schema(
     photo: {
       type: String,
     },
+    estado: {
+      type: String,
+      default: "ACTIVO",
+    },
     modules: [
       {
         name: {
           type: String,
           ref: "Module",
         },
+        moduleId: { type: mongoose.Schema.Types.ObjectId, ref: "Module" },
         submodule: {
           name: {
             type: String,
             ref: "Submodule",
           },
+          submoduleId: { type: mongoose.Schema.Types.ObjectId, ref: "Submodule" },
           permissions: [
             {
               type: String,

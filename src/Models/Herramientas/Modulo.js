@@ -7,6 +7,10 @@ const moduleSchema = mongoose.Schema(
       required: true,
       unique: true,
     },
+    slug: { type: String, unique: true, sparse: true },
+    icon: { type: String, default: "" },
+    order: { type: Number, default: 0 },
+    active: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

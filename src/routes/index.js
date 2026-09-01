@@ -3,6 +3,7 @@ const { Router } = require("express");
 const comercialRouter = require("./Modulos/Comercial");
 const verifyToken = require("../controllers/auth/verifyToken");
 const herramientasRouter = require("./Modulos/Herramientas");
+const operacionesRouter = require("./Modulos/Operaciones");
 const login = require("../controllers/Herramientas/User/login");
 
 const router = Router();
@@ -15,5 +16,6 @@ router.get("/auth/verify", verifyToken);
 
 router.use("/comercial", comercialRouter);
 router.use("/herramientas", herramientasRouter);
+router.use("/operaciones", operacionesRouter);
 
 module.exports = router;
