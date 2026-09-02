@@ -8,6 +8,8 @@
     "start": "node index.js",
     "seed:system-access": "node scripts/seed-system-access.js",
     "drop:informes-id-index": "node scripts/drop-informe-idacceso-unique-index.js",
+    "backfill:informes-metadata:dry": "node scripts/backfill-informes-metadata.js",
+    "backfill:informes-metadata": "node scripts/backfill-informes-metadata.js --write",
     "migrate:qrensayo": "node scripts/migrate-qrensayo.js",
     "migrate:qrensayo:dry": "node scripts/migrate-qrensayo.js --dry-run"
   },
