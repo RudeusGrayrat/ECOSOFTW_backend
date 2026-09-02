@@ -391,7 +391,7 @@ exports.archivoPublico = async (req, res) => {
     const version = report.versiones.find((item) => item.numero === report.versionActual);
     const filePath = assertInsideStorage(version?.publicado?.path || "");
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="${version.publicado.filename}"`);
+    res.setHeader("Content-Disposition", `${req.query.download === "true" ? "attachment" : "inline"}; filename="${version.publicado.filename}"`);
     res.sendFile(filePath);
   } catch (error) {
     res.status(500).json({ message: error.message });

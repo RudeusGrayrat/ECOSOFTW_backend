@@ -16,6 +16,21 @@ const auditSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
 }, { _id: false });
 
+const migracionSchema = new mongoose.Schema({
+  origen: String,
+  legacyId: String,
+  codigoLegacy: String,
+  llaveLegacy: String,
+  archivoLegacy: String,
+  fechaOperacion: Date,
+  registrado: String,
+  fechaRegistro: Date,
+  modificado: String,
+  fechaModificacion: Date,
+  estadoLegacy: String,
+  eliminacionLogica: String,
+}, { _id: false });
+
 const informeEnsayoSchema = new mongoose.Schema({
   codigo: { type: String, required: true, unique: true, uppercase: true, trim: true },
   idAcceso: { type: String, required: true, unique: true, uppercase: true, trim: true },
@@ -28,6 +43,7 @@ const informeEnsayoSchema = new mongoose.Schema({
   versionActual: { type: Number, default: 0 },
   versiones: [versionSchema],
   auditoria: [auditSchema],
+  migracion: migracionSchema,
 }, { timestamps: true });
 
 module.exports = mongoose.model("operaciones_informes_ensayo", informeEnsayoSchema);

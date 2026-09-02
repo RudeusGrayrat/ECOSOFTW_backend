@@ -8,7 +8,10 @@ const routes = require("./routes/index");
 const bodyParser = require("body-parser");
 // const fileUpload = require("express-fileupload"); //permite subir archivos al servidor
 const http = require("http"); // Importar http para usarlo con Socket.IO
+const socketIo = require("socket.io");
 const tokenVerify = require("./controllers/auth/midellware");
+const attachUser = require("./controllers/auth/attachUser");
+const notifyActionMiddleware = require("./controllers/Herramientas/Notifications/notifyActionMiddleware");
 const { FRONTEND_URL, FRONTEND2_URL } = process.env;
 
 const allowedOrigins = [
@@ -52,31 +55,35 @@ app.use((req, res, next) => {
 
 app.use(cookieParser());
 app.use(express.json());
+app.use(attachUser);
+app.use(notifyActionMiddleware);
 app.use("/api", routes);
 
 // Crear el servidor HTTP para Express
 const httpServer = http.createServer(app);
 
-// Configurar Socket.IO y habilitar CORS
-// const io = socketIo(httpServer, {
-//   cors: {
-//     origin: allowedOrigins, // Usar el array de URLs permitidas
-//     methods: ["GET", "POST"],
-//     credentials: true, // Permitir credenciales
-//   },
-// });
-// app.set("io", io); // <- ESTO es lo que falta
+const io = socketIo(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    credentials: true,
+  },
+});
 
-// io.on("connection", (socket) => {
-//   // El frontend debe enviar el ID del usuario al conectarse
-//   socket.on("register", (employeeId) => {
-//     socket.join(employeeId); // Así puedes senviarle mensajes individualmente
-//     console.log(`Socket ${socket.id} unido a ${employeeId}`);
-//   });
+app.set("io", io);
 
-//   socket.on("disconnect", () => {
-//     console.log(`Socket ${socket.id} desconectado`);
-//   });
-// });
+io.on("connection", (socket) => {
+  socket.on("register_session", ({ userId, submodules }) => {
+    if (!userId) return;
+    socket.join(userId.toString());
+    socket.join("ERP_GLOBAL");
+
+    if (Array.isArray(submodules)) {
+      submodules.forEach((submodule) => {
+        if (submodule) socket.join(`SUBMODULE_${submodule.toString().toUpperCase()}`);
+      });
+    }
+  });
+});
 
 module.exports = { app, httpServer }; // Exporta tanto la app como el servidor

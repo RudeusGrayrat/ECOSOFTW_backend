@@ -12,12 +12,17 @@ const getUsuariosPaginacion = require("../../controllers/Herramientas/User/getUs
 const getCatalogoAccesos = require("../../controllers/Herramientas/User/getCatalogoAccesos");
 const EliminarDocumento = require("../../controllers/Comercial/Cotizaciones/eliminarDocumento");
 const PatchUser = require("../../controllers/Herramientas/User/pacthUser");
+const requireAuth = require("../../controllers/auth/requireAuth");
+const getNotifications = require("../../controllers/Herramientas/Notifications/getNotifications");
+const markNotificationRead = require("../../controllers/Herramientas/Notifications/markNotificationRead");
 
 const herramientasRouter = Router();
 
 herramientasRouter.post("/postUsuariosEcosoft", postUsuariosEcosoft);
 herramientasRouter.get("/getUsuariosPaginacion", getUsuariosPaginacion);
 herramientasRouter.get("/getCatalogoAccesos", getCatalogoAccesos);
+herramientasRouter.get("/notificaciones", requireAuth, getNotifications);
+herramientasRouter.patch("/notificaciones/:id/leida", requireAuth, markNotificationRead);
 herramientasRouter.post("/postModule", createModule);
 herramientasRouter.post("/postSubModule", createSubmodule);
 herramientasRouter.post("/postPermission", postPermissions);
