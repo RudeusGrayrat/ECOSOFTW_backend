@@ -52,6 +52,17 @@ const detectCode = (filename = "") => {
   return "";
 };
 
+const parseInformeFilename = (filename = "") => {
+  const baseName = path.basename(filename, path.extname(filename)).trim();
+  const pmMatch = baseName.match(/\((PM\s*[^)]+)\)/i);
+  const matrizMatch = baseName.match(/\)\s*.*-\s*([^-()]+)$/) || baseName.match(/-\s*([^-()]+)$/);
+
+  return {
+    pm: pmMatch?.[1]?.replace(/\s+/g, " ").trim().toUpperCase() || "",
+    matriz: matrizMatch?.[1]?.replace(/\s+/g, " ").trim().toUpperCase() || "",
+  };
+};
+
 const randomAccessId = () => crypto.randomBytes(12).toString("base64url").replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
 
 async function uniqueAccessId() {
@@ -303,8 +314,16 @@ exports.listar = async (req, res) => {
     res.json({
       data: data.map((item) => ({
         ...item,
-        archivoGenerado: item.versiones?.find((version) => version.numero === item.versionActual)?.publicado?.filename || "",
-        urlConsulta: portalUrl(),
+        ...(() => {
+          const versionActual = item.versiones?.find((version) => version.numero === item.versionActual);
+          const originalFilename = versionActual?.original?.filename || item.migracion?.archivoLegacy || "";
+          return {
+            ...parseInformeFilename(originalFilename),
+            archivoOriginal: originalFilename,
+            archivoGenerado: versionActual?.publicado?.filename || "",
+            urlConsulta: portalUrl(),
+          };
+        })(),
       })),
       total,
     });

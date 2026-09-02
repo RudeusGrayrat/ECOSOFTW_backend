@@ -19,18 +19,112 @@ const actionByMethod = {
   DELETE: "ELIMINO",
 };
 
-const titleByAction = {
-  CREO: "Nuevo registro",
-  ACTUALIZO: "Registro actualizado",
-  ELIMINO: "Registro eliminado",
+const actionLabel = {
+  CREO: "creó",
+  ACTUALIZO: "actualizó",
+  ELIMINO: "eliminó",
 };
 
 const userLabel = (user) => user?.colaborador || user?.userName || "Un colaborador";
 const findScope = (path) => routeMap.find((item) => item.pattern.test(path));
+const clean = (value) => (value || "").toString().trim();
+const pick = (...values) => values.map(clean).find(Boolean);
+
+const entityNameByScope = {
+  CLIENTES: "cliente",
+  COTIZACIONES: "cotización",
+  PROYECTOS: "proyecto",
+  PARAMETROS: "parámetro",
+  "TIPOS DE GASTOS": "tipo de gasto",
+  USUARIOS: "usuario",
+  PERMISOS: "permiso",
+  "MODULOS Y SUBMODULOS": "módulo/submódulo",
+  "INFORMES DE ENSAYO": "informe de ensayo",
+};
+
+const titleBy = (scope, action, req) => {
+  const entity = entityNameByScope[scope.submodule] || "registro";
+  const path = req.originalUrl || req.path;
+
+  if (path.includes("/configuracion/firma")) {
+    if (req.method === "DELETE") return "Firma autorizada eliminada";
+    return "Firma autorizada actualizada";
+  }
+  if (path.includes("/configuracion/marca-agua")) {
+    const tipo = clean(req.params?.tipo).replace(/_/g, " ");
+    if (req.method === "DELETE") return `Marca de agua ${tipo} eliminada`;
+    return `Marca de agua ${tipo} actualizada`;
+  }
+  if (path.includes("/informes-ensayo/procesar")) {
+    return action === "CREO" ? "Informe de ensayo procesado" : "Informe de ensayo reemplazado";
+  }
+  if (path.includes("/publicar")) return "Informe disponible";
+  if (path.includes("/anular")) return "Informe no disponible";
+
+  if (action === "CREO") return `Nuevo ${entity}`;
+  if (action === "ACTUALIZO") return `${entity.charAt(0).toUpperCase()}${entity.slice(1)} actualizado`;
+  if (action === "ELIMINO") return `${entity.charAt(0).toUpperCase()}${entity.slice(1)} eliminado`;
+  return "Movimiento registrado";
+};
+
+const describeTarget = (req, responseBody = {}) => {
+  const data = responseBody?.data || responseBody?.saved || responseBody?.item || {};
+  const body = req.body || {};
+
+  return pick(
+    responseBody?.idAcceso && data?.codigo ? `${data.codigo} - ID ${responseBody.idAcceso}` : "",
+    data?.codigo && data?.idAcceso ? `${data.codigo} - ID ${data.idAcceso}` : "",
+    data?.codigo,
+    body?.codigo,
+    data?.cliente,
+    body?.cliente,
+    data?.nombre,
+    body?.nombre,
+    data?.name,
+    body?.name,
+    data?.userName,
+    body?.userName,
+    data?.tipoDeGasto,
+    body?.tipoDeGasto,
+    data?.parametro,
+    body?.parametro,
+    req.file?.originalname,
+    req.params?.id
+  );
+};
+
+const detailBy = (req, responseBody = {}, scope, action) => {
+  const body = req.body || {};
+  const data = responseBody?.data || {};
+  const parts = [];
+
+  const target = describeTarget(req, responseBody);
+  if (target) parts.push(`Registro: ${target}`);
+  if (body.estado || data.estado) parts.push(`Estado: ${body.estado || data.estado}`);
+  if (body.tipoPlantilla || data?.plantilla?.tipo) parts.push(`Marca de agua: ${body.tipoPlantilla || data.plantilla.tipo}`);
+  if (responseBody?.idAcceso || data?.idAcceso) parts.push(`ID de acceso: ${responseBody.idAcceso || data.idAcceso}`);
+  if (req.file?.originalname) parts.push(`Archivo: ${req.file.originalname}`);
+  if (body.motivo) parts.push(`Observación: ${body.motivo}`);
+  if (responseBody?.message) parts.push(`Resultado: ${responseBody.message}`);
+
+  if (!parts.length) {
+    const entity = entityNameByScope[scope.submodule] || "registro";
+    parts.push(`Se ${actionLabel[action] || "registró"} un ${entity} en ${scope.module}.`);
+  }
+
+  return parts.join(" | ");
+};
 
 const notifyActionMiddleware = (req, res, next) => {
   if (!["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) return next();
   if (req.path.includes("/publico/") || req.path.includes("/login") || req.path.includes("/notificaciones")) return next();
+
+  let responseBody = null;
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    responseBody = body;
+    return originalJson(body);
+  };
 
   res.on("finish", async () => {
     if (res.statusCode < 200 || res.statusCode >= 300 || !req.user?._id) return;
@@ -41,9 +135,12 @@ const notifyActionMiddleware = (req, res, next) => {
     const action = actionByMethod[req.method] || "EJECUTO";
 
     try {
+      const target = describeTarget(req, responseBody);
+      const entity = entityNameByScope[scope.submodule] || "registro";
       await NotificationService.send(req.app.get("io"), {
-        title: titleByAction[action] || "Accion registrada",
-        message: `${userLabel(req.user)} ${action.toLowerCase()} una accion en ${scope.submodule}.`,
+        title: titleBy(scope, action, req),
+        message: `${userLabel(req.user)} ${actionLabel[action] || "registró"} ${target ? `${entity}: ${target}` : `un ${entity}`} en ${scope.submodule}.`,
+        detail: detailBy(req, responseBody, scope, action),
         type: "SUBMODULE",
         module: scope.module,
         submodule: scope.submodule,

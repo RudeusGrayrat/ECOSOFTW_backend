@@ -4,6 +4,7 @@ const notificationSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
+    detail: { type: String, trim: true },
     type: { type: String, enum: ["GLOBAL", "SUBMODULE", "INDIVIDUAL"], required: true },
     module: { type: String, uppercase: true, trim: true },
     submodule: { type: String, uppercase: true, trim: true },
