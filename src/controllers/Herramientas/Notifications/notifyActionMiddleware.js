@@ -9,6 +9,7 @@ const routeMap = [
   { pattern: /^\/api\/herramientas\/.*Usuarios/i, module: "HERRAMIENTAS", submodule: "USUARIOS" },
   { pattern: /^\/api\/herramientas\/.*Permissions|^\/api\/herramientas\/.*Permission/i, module: "HERRAMIENTAS", submodule: "PERMISOS" },
   { pattern: /^\/api\/herramientas\/.*Modules?|^\/api\/herramientas\/.*SubModules?|^\/api\/herramientas\/.*Modulo/i, module: "HERRAMIENTAS", submodule: "MODULOS Y SUBMODULOS" },
+  { pattern: /^\/api\/operaciones\/informes-ensayo\/configuracion/i, module: "OPERACIONES", submodule: "CONFIGURACION" },
   { pattern: /^\/api\/operaciones\/informes-ensayo/i, module: "OPERACIONES", submodule: "INFORMES DE ENSAYO" },
 ];
 
@@ -40,6 +41,7 @@ const entityNameByScope = {
   PERMISOS: "permiso",
   "MODULOS Y SUBMODULOS": "módulo/submódulo",
   "INFORMES DE ENSAYO": "informe de ensayo",
+  CONFIGURACION: "configuración",
 };
 
 const titleBy = (scope, action, req) => {
@@ -58,8 +60,10 @@ const titleBy = (scope, action, req) => {
   if (path.includes("/informes-ensayo/procesar")) {
     return action === "CREO" ? "Informe de ensayo procesado" : "Informe de ensayo reemplazado";
   }
-  if (path.includes("/publicar")) return "Informe disponible";
-  if (path.includes("/anular")) return "Informe no disponible";
+  if (path.includes("/aprobar") || path.includes("/publicar")) return "Visto bueno de jefatura";
+  if (path.includes("/liberar")) return "Informe oficial liberado";
+  if (path.includes("/papelera") || path.includes("/anular")) return "Informe enviado a papelera";
+  if (path.includes("/restablecer")) return "Informe restablecido";
 
   if (action === "CREO") return `Nuevo ${entity}`;
   if (action === "ACTUALIZO") return `${entity.charAt(0).toUpperCase()}${entity.slice(1)} actualizado`;
@@ -75,6 +79,7 @@ const describeTarget = (req, responseBody = {}) => {
     responseBody?.idAcceso && data?.codigo ? `${data.codigo} - ID ${responseBody.idAcceso}` : "",
     data?.codigo && data?.idAcceso ? `${data.codigo} - ID ${data.idAcceso}` : "",
     data?.codigo,
+    Array.isArray(data) ? `${data.length} informe(s)` : "",
     body?.codigo,
     data?.cliente,
     body?.cliente,
@@ -89,6 +94,7 @@ const describeTarget = (req, responseBody = {}) => {
     data?.parametro,
     body?.parametro,
     req.file?.originalname,
+    req.files?.archivos?.length ? `${req.files.archivos.length} archivo(s)` : "",
     req.params?.id
   );
 };
@@ -104,7 +110,9 @@ const detailBy = (req, responseBody = {}, scope, action) => {
   if (body.tipoPlantilla || data?.plantilla?.tipo) parts.push(`Marca de agua: ${body.tipoPlantilla || data.plantilla.tipo}`);
   if (responseBody?.idAcceso || data?.idAcceso) parts.push(`ID de acceso: ${responseBody.idAcceso || data.idAcceso}`);
   if (req.file?.originalname) parts.push(`Archivo: ${req.file.originalname}`);
+  if (req.files?.archivos?.length) parts.push(`Archivos cargados: ${req.files.archivos.map((file) => file.originalname).join(", ")}`);
   if (body.motivo) parts.push(`Observación: ${body.motivo}`);
+  if (responseBody?.conflicts?.length) parts.push(`Conflictos: ${responseBody.conflicts.length}`);
   if (responseBody?.message) parts.push(`Resultado: ${responseBody.message}`);
 
   if (!parts.length) {

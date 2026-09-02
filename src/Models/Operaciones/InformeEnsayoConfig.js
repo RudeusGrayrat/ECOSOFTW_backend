@@ -15,6 +15,7 @@ const informeEnsayoConfigSchema = new mongoose.Schema({
     INACAL: assetSchema,
     NAC: assetSchema,
     SIN_ACREDITACION: assetSchema,
+    VERSION_PRELIMINAR: assetSchema,
     default: {},
   },
 }, { timestamps: true });

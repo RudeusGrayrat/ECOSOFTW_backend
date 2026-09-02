@@ -189,7 +189,7 @@ const getResumenDashboard = async (_, res) => {
       ComercialProyectos.countDocuments(),
       ComercialProyectos.countDocuments({ estado: { $in: ["ACTIVO", "COTIZADO"] } }),
       InformeEnsayo.countDocuments(),
-      InformeEnsayo.countDocuments({ estado: "DISPONIBLE" }),
+      InformeEnsayo.countDocuments({ estado: { $in: ["LIBERADO", "DISPONIBLE"] }, papelera: { $ne: true } }),
       User.countDocuments(),
       User.countDocuments({ estado: "ACTIVO" }),
       Module.countDocuments({ active: true }),

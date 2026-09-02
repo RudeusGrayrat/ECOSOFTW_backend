@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
     "seed:system-access": "node scripts/seed-system-access.js",
+    "drop:informes-id-index": "node scripts/drop-informe-idacceso-unique-index.js",
     "migrate:qrensayo": "node scripts/migrate-qrensayo.js",
     "migrate:qrensayo:dry": "node scripts/migrate-qrensayo.js --dry-run"
   },
@@ -25,6 +26,7 @@
     "mongoose": "^8.19.3",
     "morgan": "^1.10.1",
     "multer": "^2.3.0",
+    "nodemailer": "^6.10.1",
     "nodemon": "^3.1.10",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",

@@ -27,6 +27,7 @@ const modules = [
     order: 2,
     submodules: [
       { name: "INFORMES DE ENSAYO", slug: "informes de ensayo", order: 1 },
+      { name: "CONFIGURACION", slug: "configuracion", order: 2 },
     ],
   },
 ];
