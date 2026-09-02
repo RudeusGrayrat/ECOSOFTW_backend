@@ -75,6 +75,11 @@ async function saveConfigFile(filename, buffer) {
   return absolutePath;
 }
 
+async function removeStoredFile(filePath) {
+  if (!filePath) return;
+  await fs.rm(assertInsideStorage(filePath), { force: true });
+}
+
 async function getConfig() {
   return InformeConfig.findOneAndUpdate(
     { key: "default" },
@@ -110,18 +115,30 @@ function verifyViewToken(token) {
 }
 
 async function processPdf(source, report) {
-  const pdf = await PDFDocument.load(source);
+  const originalPdf = await PDFDocument.load(source);
   const config = await getConfig();
-  const firstPage = pdf.getPages()[0];
   const watermark = config.marcasAgua?.[report.plantilla?.tipo];
+  let pdf = originalPdf;
 
   if (watermark?.path) {
+    const watermarkedPdf = await PDFDocument.create();
     const watermarkBytes = await fs.readFile(assertInsideStorage(watermark.path));
-    const [watermarkPage] = await pdf.embedPdf(watermarkBytes, [0]);
-    for (const page of pdf.getPages()) {
-      const { width, height } = page.getSize();
-      page.drawPage(watermarkPage, { x: 0, y: 0, width, height, opacity: 0.28 });
-    }
+    const [watermarkPage] = await watermarkedPdf.embedPdf(watermarkBytes, [0]);
+    const originalPages = await watermarkedPdf.embedPages(originalPdf.getPages());
+
+    originalPdf.getPages().forEach((originalPage, index) => {
+      const { width, height } = originalPage.getSize();
+      const page = watermarkedPdf.addPage([width, height]);
+      page.drawPage(watermarkPage, { x: 0, y: 0, width, height });
+      page.drawPage(originalPages[index], { x: 0, y: 0, width, height });
+    });
+
+    pdf = watermarkedPdf;
+  }
+
+  const firstPage = pdf.getPages()[0];
+  if (!firstPage) {
+    throw new Error("El PDF no tiene páginas para procesar");
   }
 
   const qr = await QRCode.toDataURL(portalUrl(), { margin: 1, width: 280 });
@@ -201,9 +218,22 @@ exports.actualizarFirma = async (req, res) => {
     const extension = req.file.mimetype === "image/png" ? "png" : "jpg";
     const filename = `firma_autorizada_${Date.now()}.${extension}`;
     const filePath = await saveConfigFile(filename, req.file.buffer);
+    await removeStoredFile(config.firma?.path);
     config.firma = { path: filePath, filename, mimetype: req.file.mimetype, bytes: req.file.size, updatedAt: new Date() };
     await config.save();
     res.json({ message: "Firma actualizada correctamente", type: "Correcto", data: config });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.eliminarFirma = async (_req, res) => {
+  try {
+    const config = await getConfig();
+    await removeStoredFile(config.firma?.path);
+    config.firma = undefined;
+    await config.save();
+    res.json({ message: "Firma eliminada correctamente", type: "Correcto", data: config });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -218,9 +248,26 @@ exports.actualizarMarcaAgua = async (req, res) => {
     const filename = `marca_${tipo}_${Date.now()}.pdf`;
     const filePath = await saveConfigFile(filename, req.file.buffer);
     if (!config.marcasAgua) config.marcasAgua = {};
+    await removeStoredFile(config.marcasAgua?.[tipo]?.path);
     config.marcasAgua[tipo] = { path: filePath, filename, mimetype: req.file.mimetype, bytes: req.file.size, updatedAt: new Date() };
     await config.save();
     res.json({ message: "Marca de agua actualizada correctamente", type: "Correcto", data: config });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.eliminarMarcaAgua = async (req, res) => {
+  try {
+    const tipo = normalize(req.params.tipo);
+    if (!["INACAL", "NAC", "SIN_ACREDITACION"].includes(tipo)) return res.status(400).json({ message: "Tipo de marca de agua no válido" });
+    const config = await getConfig();
+    await removeStoredFile(config.marcasAgua?.[tipo]?.path);
+    if (!config.marcasAgua) config.marcasAgua = {};
+    config.marcasAgua[tipo] = undefined;
+    config.markModified("marcasAgua");
+    await config.save();
+    res.json({ message: "Marca de agua eliminada correctamente", type: "Correcto", data: config });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

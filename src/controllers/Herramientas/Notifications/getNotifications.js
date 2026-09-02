@@ -11,7 +11,6 @@ const getNotifications = async (req, res) => {
       .map((name) => name.toUpperCase());
 
     const visibleFilter = {
-      creator: { $ne: user._id },
       $or: [
         { type: "GLOBAL" },
         { type: "SUBMODULE", submodule: { $in: submodules } },
@@ -21,6 +20,7 @@ const getNotifications = async (req, res) => {
 
     const unreadFilter = {
       ...visibleFilter,
+      creator: { $ne: user._id },
       $and: [
         {
           $or: [
