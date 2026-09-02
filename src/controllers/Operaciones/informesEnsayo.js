@@ -35,11 +35,11 @@ const safeSegment = (value) => normalize(value).replace(/[^A-Z0-9-]/g, "_");
 const cm = (value) => value * 28.3464567;
 const selloLayout = {
   qrX: cm(6.14),
-  qrY: cm(2.55),
+  qrY: cm(3.55),
   qrSize: cm(3.5),
   idGap: cm(0.35),
   firmaX: cm(10.45),
-  firmaY: cm(2.35),
+  firmaY: cm(3.1),
   firmaSize: cm(5),
 };
 
@@ -169,11 +169,14 @@ async function processPdf(source, report) {
     const signatureImage = config.firma.mimetype === "image/png"
       ? await pdf.embedPng(signatureBytes)
       : await pdf.embedJpg(signatureBytes);
+    const scale = Math.min(selloLayout.firmaSize / signatureImage.width, selloLayout.firmaSize / signatureImage.height);
+    const signatureWidth = signatureImage.width * scale;
+    const signatureHeight = signatureImage.height * scale;
     firstPage.drawImage(signatureImage, {
-      x: selloLayout.firmaX,
-      y: selloLayout.firmaY,
-      width: selloLayout.firmaSize,
-      height: selloLayout.firmaSize,
+      x: selloLayout.firmaX + ((selloLayout.firmaSize - signatureWidth) / 2),
+      y: selloLayout.firmaY + ((selloLayout.firmaSize - signatureHeight) / 2),
+      width: signatureWidth,
+      height: signatureHeight,
     });
   }
 
