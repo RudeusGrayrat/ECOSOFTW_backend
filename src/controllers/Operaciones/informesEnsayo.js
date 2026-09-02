@@ -33,6 +33,12 @@ const audit = (report, req, accion, detalle) => report.auditoria.push({ accion, 
 const portalUrl = () => `${process.env.PUBLIC_REPORT_URL || process.env.FRONTEND_URL || "http://localhost:5174"}/consulta-informes`;
 const normalize = (value) => (value || "").toString().trim().toUpperCase();
 const safeSegment = (value) => normalize(value).replace(/[^A-Z0-9-]/g, "_");
+const escapeHtml = (value = "") => value.toString()
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;");
 const cm = (value) => value * 28.3464567;
 const selloLayout = {
   qrX: cm(5.75),
@@ -262,36 +268,52 @@ async function enviarCorreoLiberacion(report, req, options = {}) {
   const destinatario = normalize(options.correoCliente).toLowerCase();
   if (!destinatario) return false;
 
-  const smtpUser = process.env.EMAIL_ECOLOGY;
-  const smtpPass = process.env.PASS_ECOLOGY;
-  const smtpHost = process.env.SMTP_ECOLOGY;
-  if (!smtpUser || !smtpPass || !smtpHost) throw new Error("Faltan credenciales SMTP para enviar el correo");
+  const correoUsuario = (req.user?.correoElectronico || "").trim().toLowerCase();
+  if (!correoUsuario) throw new Error("Tu usuario no tiene un correo configurado para enviar mensajes");
+
+  const smtpUser = process.env.EMAIL_CALIDAD;
+  const smtpPass = process.env.PASS_CALIDAD;
+  const smtpHost = process.env.SMTP_CALIDAD || process.env.SMTP_ECOLOGY;
+  if (!smtpUser || !smtpPass || !smtpHost) throw new Error("No está configurado el correo de Calidad para enviar informes");
 
   const transporter = nodemailer.createTransport({
     host: smtpHost,
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: String(process.env.SMTP_SECURE || "true") !== "false",
+    port: Number(process.env.SMTP_CALIDAD_PORT || process.env.SMTP_PORT || 465),
+    secure: String(process.env.SMTP_CALIDAD_SECURE || process.env.SMTP_SECURE || "true") !== "false",
     auth: { user: smtpUser, pass: smtpPass },
   });
 
-  const remitenteUsuario = req.user?.correoElectronico || smtpUser;
   const asunto = options.asunto || `Informe de ensayo ${report.codigo} liberado`;
   const mensaje = options.mensaje || "Estimado cliente, su informe de ensayo ya se encuentra disponible para consulta.";
   const consulta = portalUrl();
+  const colaborador = req.user?.colaborador || req.user?.userName || "Area de Calidad";
 
   await transporter.sendMail({
-    from: `"${req.user?.colaborador || "ECOSOFT"}" <${smtpUser}>`,
-    replyTo: remitenteUsuario,
+    from: `"ECOSOFT - Calidad" <${smtpUser}>`,
+    replyTo: correoUsuario,
     to: destinatario,
     subject: asunto,
     html: `
-      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
-        <p>${mensaje}</p>
-        <p><strong>Código:</strong> ${report.codigo}</p>
-        <p><strong>Plan de monitoreo:</strong> ${report.planMonitoreo || "-"}</p>
-        <p><strong>Matriz:</strong> ${report.matriz || "-"}</p>
-        <p><strong>ID de acceso:</strong> ${report.idAcceso}</p>
-        <p><strong>Portal de consulta:</strong> <a href="${consulta}">${consulta}</a></p>
+      <div style="margin:0;padding:0;background:#f3f7f4;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+        <div style="max-width:680px;margin:0 auto;padding:32px 18px;">
+          <div style="background:linear-gradient(135deg,#4fa36f,#2f6f4c);border-radius:24px 24px 0 0;padding:28px 32px;color:#ffffff;">
+            <p style="margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">ECOSOFT | Calidad</p>
+            <h1 style="margin:0;font-size:28px;line-height:1.2;">Informe de ensayo disponible</h1>
+          </div>
+          <div style="background:#ffffff;border:1px solid #e5eee8;border-top:0;border-radius:0 0 24px 24px;padding:30px 32px;box-shadow:0 18px 45px rgba(31,41,55,.10);">
+            <p style="margin:0 0 22px;font-size:16px;line-height:1.65;">${escapeHtml(mensaje)}</p>
+            <div style="display:grid;gap:10px;margin:24px 0;padding:18px;border-radius:18px;background:#f8faf9;border:1px solid #e5eee8;">
+              <p style="margin:0;"><strong>Codigo:</strong> ${escapeHtml(report.codigo)}</p>
+              <p style="margin:0;"><strong>Plan de monitoreo:</strong> ${escapeHtml(report.planMonitoreo || "-")}</p>
+              <p style="margin:0;"><strong>Matriz:</strong> ${escapeHtml(report.matriz || "-")}</p>
+              <p style="margin:0;"><strong>ID de acceso:</strong> <span style="font-size:18px;font-weight:800;color:#2f6f4c;">${escapeHtml(report.idAcceso)}</span></p>
+            </div>
+            <a href="${consulta}" style="display:inline-block;background:#2f6f4c;color:#ffffff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:999px;">Consultar informe</a>
+            <p style="margin:24px 0 0;font-size:13px;color:#64748b;line-height:1.6;">
+              Si necesita responder este mensaje, puede hacerlo directamente. Su respuesta llegara a ${escapeHtml(colaborador)} (${escapeHtml(correoUsuario)}).
+            </p>
+          </div>
+        </div>
       </div>
     `,
   });
