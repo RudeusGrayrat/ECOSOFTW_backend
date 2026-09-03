@@ -447,6 +447,7 @@ exports.listar = async (req, res) => {
     acreditacion = "",
     estado = "",
     vistoBuenoJefatura = "",
+    filters: tableFilterPayload = "",
     sortField = "createdAt",
     sortOrder = -1,
   } = req.query;
@@ -468,27 +469,80 @@ exports.listar = async (req, res) => {
     const papeleraFilter = papelera === "true"
       ? { papelera: true }
       : { $or: [{ papelera: false }, { papelera: { $exists: false } }] };
-    const filters = [papeleraFilter];
-    if (search) filters.push(searchable);
-    if (codigo) filters.push({ codigo: regex(codigo) });
-    if (planMonitoreo) filters.push({ planMonitoreo: regex(planMonitoreo) });
-    if (cliente) filters.push({ cliente: regex(cliente) });
-    if (matriz) filters.push({ matriz: regex(matriz) });
-    if (idAcceso) filters.push({ idAcceso: regex(idAcceso) });
-    if (acreditacion) filters.push({ acreditacion: normalize(acreditacion) });
-    if (estado) filters.push({ estado: normalize(estado) === "LIBERADO" ? { $in: ["LIBERADO", "DISPONIBLE"] } : normalize(estado) });
+    const filterParts = [papeleraFilter];
+    if (search) filterParts.push(searchable);
+    if (codigo) filterParts.push({ codigo: regex(codigo) });
+    if (planMonitoreo) filterParts.push({ planMonitoreo: regex(planMonitoreo) });
+    if (cliente) filterParts.push({ cliente: regex(cliente) });
+    if (matriz) filterParts.push({ matriz: regex(matriz) });
+    if (idAcceso) filterParts.push({ idAcceso: regex(idAcceso) });
+    if (acreditacion) filterParts.push({ acreditacion: normalize(acreditacion) });
+    if (estado) filterParts.push({ estado: normalize(estado) === "LIBERADO" ? { $in: ["LIBERADO", "DISPONIBLE"] } : normalize(estado) });
     if (vistoBuenoJefatura === "SI") {
-      filters.push({ $or: [{ vistoBuenoJefatura: true }, { estado: { $in: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] } }] });
+      filterParts.push({ $or: [{ vistoBuenoJefatura: true }, { estado: { $in: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] } }] });
     }
     if (vistoBuenoJefatura === "NO") {
-      filters.push({
+      filterParts.push({
         $and: [
           { $or: [{ vistoBuenoJefatura: false }, { vistoBuenoJefatura: { $exists: false } }] },
           { estado: { $nin: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] } },
         ],
       });
     }
-    const filter = { $and: filters };
+    const textCondition = (field, value, matchMode = "contains") => {
+      const safeValue = escapeRegExp(value);
+      const pattern = matchMode === "startsWith"
+        ? `^${safeValue}`
+        : matchMode === "endsWith"
+          ? `${safeValue}$`
+          : matchMode === "equals"
+            ? `^${safeValue}$`
+            : safeValue;
+      const expression = new RegExp(pattern, "i");
+      return matchMode === "notEquals" ? { [field]: { $not: expression } } : { [field]: expression };
+    };
+    const exactCondition = (field, value) => {
+      const normalized = normalize(value);
+      if (field === "estado" && normalized === "LIBERADO") return { estado: { $in: ["LIBERADO", "DISPONIBLE"] } };
+      if (field === "vistoBuenoJefatura" && normalized === "SI") {
+        return { $or: [{ vistoBuenoJefatura: true }, { estado: { $in: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] } }] };
+      }
+      if (field === "vistoBuenoJefatura" && normalized === "NO") {
+        return {
+          $and: [
+            { $or: [{ vistoBuenoJefatura: false }, { vistoBuenoJefatura: { $exists: false } }] },
+            { estado: { $nin: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] } },
+          ],
+        };
+      }
+      return { [field]: normalized };
+    };
+    const addPrimeTableFilters = () => {
+      if (!tableFilterPayload) return;
+      let parsedFilters = {};
+      try {
+        parsedFilters = JSON.parse(tableFilterPayload);
+      } catch (_) {
+        return;
+      }
+
+      const exactFields = ["acreditacion", "estado", "vistoBuenoJefatura"];
+      const allowedFields = ["codigo", "planMonitoreo", "matriz", "idAcceso", ...exactFields];
+      allowedFields.forEach((field) => {
+        const meta = parsedFilters[field];
+        if (!meta) return;
+        const constraints = Array.isArray(meta.constraints) ? meta.constraints : [meta];
+        const conditions = constraints
+          .filter((constraint) => constraint?.value !== null && constraint?.value !== undefined && constraint?.value !== "")
+          .map((constraint) => exactFields.includes(field)
+            ? exactCondition(field, constraint.value)
+            : textCondition(field, constraint.value, constraint.matchMode));
+        if (!conditions.length) return;
+        filterParts.push(meta.operator === "or" ? { $or: conditions } : { $and: conditions });
+      });
+    };
+    addPrimeTableFilters();
+    const filter = { $and: filterParts };
     const sortableFields = ["codigo", "planMonitoreo", "matriz", "idAcceso", "acreditacion", "vistoBuenoJefatura", "estado", "createdAt"];
     const sortKey = sortableFields.includes(sortField) ? sortField : "createdAt";
     const sortDirection = Number(sortOrder) === 1 ? 1 : -1;
