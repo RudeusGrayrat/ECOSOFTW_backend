@@ -12,6 +12,7 @@ const QRCode = require("qrcode");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 const Informe = require("../../Models/Operaciones/InformeEnsayo");
 const InformeConfig = require("../../Models/Operaciones/InformeEnsayoConfig");
+const escapeRegExp = require("../../utils/escapeRegex");
 
 const execFileAsync = promisify(execFile);
 const storageRoot = path.resolve(process.env.INFORMES_STORAGE_PATH || path.join(process.cwd(), "storage", "informes-ensayo"));
@@ -715,32 +716,77 @@ exports.archivoAdmin = async (req, res) => {
   }
 };
 
+function officialReportFilters(params = {}) {
+  const { search = "", codigo = "", planMonitoreo = "", cliente = "", matriz = "", acreditacion = "", ids = [] } = params;
+  const regex = (value) => ({ $regex: escapeRegExp(value), $options: "i" });
+  const filters = [
+    { estado: { $in: ["LIBERADO", "DISPONIBLE"] } },
+    { papelera: { $ne: true } },
+  ];
+
+  if (Array.isArray(ids) && ids.length) filters.push({ _id: { $in: ids } });
+  if (search) {
+    filters.push({
+      $or: [
+        { codigo: regex(search) },
+        { planMonitoreo: regex(search) },
+        { cliente: regex(search) },
+        { matriz: regex(search) },
+        { acreditacion: regex(search) },
+      ],
+    });
+  }
+  if (codigo) filters.push({ codigo: regex(codigo) });
+  if (planMonitoreo) filters.push({ planMonitoreo: regex(planMonitoreo) });
+  if (cliente) filters.push({ cliente: regex(cliente) });
+  if (matriz) filters.push({ matriz: regex(matriz) });
+  if (acreditacion) filters.push({ acreditacion: normalize(acreditacion) });
+
+  return { $and: filters };
+}
+
+const officialVersionFor = (report) => [...(report.versiones || [])].reverse().find((item) =>
+  item.tipo === "OFICIAL" || report.estado === "LIBERADO" || report.estado === "DISPONIBLE"
+);
+
+exports.listarOficialesReporte = async (req, res) => {
+  const { page = 0, limit = 25 } = req.query;
+  try {
+    const filter = officialReportFilters(req.query);
+    const [data, total] = await Promise.all([
+      Informe.find(filter)
+        .sort({ codigo: 1 })
+        .skip(Number(page) * Number(limit))
+        .limit(Number(limit))
+        .select("codigo planMonitoreo cliente matriz acreditacion idAcceso estado versiones")
+        .lean(),
+      Informe.countDocuments(filter),
+    ]);
+
+    res.json({
+      data: data.map((report) => {
+        const version = officialVersionFor(report);
+        return {
+          _id: report._id,
+          codigo: report.codigo,
+          planMonitoreo: report.planMonitoreo,
+          cliente: report.cliente,
+          matriz: report.matriz,
+          acreditacion: report.acreditacion,
+          idAcceso: report.idAcceso,
+          archivo: visibleProcessedName(report, version) || `IE_${safeSegment(report.codigo)}.pdf`,
+        };
+      }),
+      total,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 exports.descargarOficialesReporte = async (req, res) => {
   try {
-    const { search = "", codigo = "", planMonitoreo = "", cliente = "", matriz = "", acreditacion = "" } = req.body || {};
-    const filters = [
-      { estado: { $in: ["LIBERADO", "DISPONIBLE"] } },
-      { papelera: { $ne: true } },
-    ];
-
-    if (search) {
-      filters.push({
-        $or: [
-          { codigo: { $regex: search, $options: "i" } },
-          { planMonitoreo: { $regex: search, $options: "i" } },
-          { cliente: { $regex: search, $options: "i" } },
-          { matriz: { $regex: search, $options: "i" } },
-          { acreditacion: { $regex: search, $options: "i" } },
-        ],
-      });
-    }
-    if (codigo) filters.push({ codigo: { $regex: codigo, $options: "i" } });
-    if (planMonitoreo) filters.push({ planMonitoreo: { $regex: planMonitoreo, $options: "i" } });
-    if (cliente) filters.push({ cliente: { $regex: cliente, $options: "i" } });
-    if (matriz) filters.push({ matriz: { $regex: matriz, $options: "i" } });
-    if (acreditacion) filters.push({ acreditacion: normalize(acreditacion) });
-
-    const informes = await Informe.find(filters.length ? { $and: filters } : {}).sort({ codigo: 1 }).limit(5000).lean();
+    const informes = await Informe.find(officialReportFilters(req.body || {})).sort({ codigo: 1 }).limit(5000).lean();
     if (!informes.length) return res.status(404).json({ message: "No se encontraron informes oficiales para descargar" });
 
     res.setHeader("Content-Type", "application/zip");
@@ -755,9 +801,7 @@ exports.descargarOficialesReporte = async (req, res) => {
     let added = 0;
     const omitted = [];
     for (const report of informes) {
-      const version = [...(report.versiones || [])].reverse().find((item) =>
-        item.tipo === "OFICIAL" || report.estado === "LIBERADO" || report.estado === "DISPONIBLE"
-      );
+      const version = officialVersionFor(report);
       const filePath = version?.publicado?.path ? assertInsideStorage(version.publicado.path) : "";
       if (!filePath) {
         omitted.push(`${report.codigo}: sin archivo oficial`);

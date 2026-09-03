@@ -5,6 +5,7 @@ const informes = require("../../controllers/Operaciones/informesEnsayo");
 const router = Router();
 
 router.get("/informes-ensayo", requireAuth, requirePermission("OPERACIONES", "INFORMES DE ENSAYO", "VER"), informes.listar);
+router.get("/informes-ensayo/reportes/oficiales", requireAuth, requirePermission("OPERACIONES", "INFORMES DE ENSAYO", "REPORTAR"), informes.listarOficialesReporte);
 router.post("/informes-ensayo/reportes/oficiales", requireAuth, requirePermission("OPERACIONES", "INFORMES DE ENSAYO", "REPORTAR"), informes.descargarOficialesReporte);
 router.get("/informes-ensayo/configuracion", requireAuth, requirePermission("OPERACIONES", "CONFIGURACION", "VER"), informes.configuracion);
 router.post("/informes-ensayo/configuracion/firma", requireAuth, requirePermission("OPERACIONES", "CONFIGURACION", "CREAR"), informes.uploadAsset, informes.actualizarFirma);
