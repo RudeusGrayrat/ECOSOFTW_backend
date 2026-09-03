@@ -7,6 +7,7 @@ const { promisify } = require("util");
 const bcrypt = require("bcrypt");
 const multer = require("multer");
 const nodemailer = require("nodemailer");
+const archiver = require("archiver");
 const QRCode = require("qrcode");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 const Informe = require("../../Models/Operaciones/InformeEnsayo");
@@ -102,15 +103,46 @@ async function accessIdForPlan(planMonitoreo) {
   return existing?.idAcceso || uniqueAccessId();
 }
 
+const safeFilenameBase = (value) => path.basename(value || "", path.extname(value || ""))
+  .replace(/[^a-zA-Z0-9-_ ()]/g, "")
+  .replace(/\s+/g, " ")
+  .trim();
+
 const filenameFor = (codigo, version, type, originalName = "") => {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const originalBase = path.basename(originalName || codigo, path.extname(originalName || codigo)).replace(/[^a-zA-Z0-9-_ ]/g, "").trim();
-  if (type === "oficial") return `IE_${safeSegment(codigo)}_${date}_v${version}.pdf`;
-  if (type === "preliminar") return `${safeSegment(originalBase || codigo)}_${date}_v${version}_preliminar.pdf`;
-  if (type === "borrador") return `${safeSegment(originalBase || codigo)}_${date}_v${version}_borrador.pdf`;
+  const originalBase = safeFilenameBase(originalName || codigo);
+  if (type === "oficial") return `IE_${safeSegment(codigo)}.pdf`;
+  if (type === "preliminar") return `PRELIMINAR_${safeSegment(codigo)}.pdf`;
+  if (type === "borrador") return `${originalBase || safeSegment(codigo)}_borrador.pdf`;
   return type === "publicado"
-    ? `IE_${safeSegment(codigo)}_${date}_v${version}.pdf`
-    : `${safeSegment(originalBase || codigo)}_${date}_v${version}_original.pdf`;
+    ? `IE_${safeSegment(codigo)}.pdf`
+    : `${originalBase || safeSegment(codigo)}.pdf`;
+};
+
+const cleanOriginalVisibleName = (filename = "") => {
+  if (!filename) return "";
+  const extension = path.extname(filename) || ".pdf";
+  const baseName = path.basename(filename, extension)
+    .replace(/_\d{8}_v\d+_original$/i, "")
+    .replace(/_v\d+_original$/i, "")
+    .replace(/_original$/i, "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${baseName}${extension}`;
+};
+
+const visibleProcessedName = (report, version) => {
+  const tipo = normalize(version?.tipo || report.tipoVersion);
+  if (tipo === "OFICIAL" || report.estado === "LIBERADO" || report.estado === "DISPONIBLE") return `IE_${safeSegment(report.codigo)}.pdf`;
+  if (tipo === "PRELIMINAR" || report.estado === "PRELIMINAR") return `PRELIMINAR_${safeSegment(report.codigo)}.pdf`;
+  return "";
+};
+
+const normalizeVersionType = (report, version) => {
+  if (version?.tipo && version.tipo !== "BORRADOR") return version.tipo;
+  if (report.tipoVersion === "OFICIAL" || report.estado === "LIBERADO" || report.estado === "DISPONIBLE") return "OFICIAL";
+  if (report.tipoVersion === "PRELIMINAR" || report.estado === "PRELIMINAR") return "PRELIMINAR";
+  return "BORRADOR";
 };
 
 async function saveFile(codigo, version, filename, buffer) {
@@ -178,6 +210,7 @@ async function processPdf(source, report, options = {}) {
   const config = await getConfig();
   const watermark = config.marcasAgua?.[tipoMarcaAgua];
   let pdf = originalPdf;
+  const isPreliminar = tipoMarcaAgua === "VERSION_PRELIMINAR";
 
   if (watermark?.path) {
     const watermarkedPdf = await PDFDocument.create();
@@ -188,8 +221,13 @@ async function processPdf(source, report, options = {}) {
     originalPdf.getPages().forEach((originalPage, index) => {
       const { width, height } = originalPage.getSize();
       const page = watermarkedPdf.addPage([width, height]);
-      page.drawPage(watermarkPage, { x: 0, y: 0, width, height });
-      page.drawPage(originalPages[index], { x: 0, y: 0, width, height });
+      if (isPreliminar) {
+        page.drawPage(originalPages[index], { x: 0, y: 0, width, height });
+        page.drawPage(watermarkPage, { x: 0, y: 0, width, height, opacity: 0.35 });
+      } else {
+        page.drawPage(watermarkPage, { x: 0, y: 0, width, height });
+        page.drawPage(originalPages[index], { x: 0, y: 0, width, height });
+      }
     });
 
     pdf = watermarkedPdf;
@@ -432,6 +470,14 @@ exports.listar = async (req, res) => {
           const originalFilename = versionActual?.original?.filename || item.migracion?.archivoLegacy || "";
           const parsed = parseInformeFilename(originalFilename);
           const estadoNormalizado = item.estado === "DISPONIBLE" ? "LIBERADO" : item.estado === "NO DISPONIBLE" ? "BORRADOR" : item.estado;
+          const versionesVisibles = (item.versiones || [])
+            .map((version) => ({
+              ...version,
+              tipo: normalizeVersionType({ ...item, estado: estadoNormalizado }, version),
+              originalVisible: cleanOriginalVisibleName(version.original?.filename || ""),
+              procesadoVisible: visibleProcessedName({ ...item, estado: estadoNormalizado }, version),
+            }))
+            .filter((version) => version.tipo !== "BORRADOR" || estadoNormalizado === "BORRADOR");
           return {
             planMonitoreo: item.planMonitoreo || parsed.planMonitoreo,
             pm: item.planMonitoreo || parsed.planMonitoreo,
@@ -441,8 +487,9 @@ exports.listar = async (req, res) => {
             tipoVersion: item.tipoVersion || versionActual?.tipo || (estadoNormalizado === "LIBERADO" ? "OFICIAL" : estadoNormalizado),
             vistoBuenoJefatura: Boolean(item.vistoBuenoJefatura || estadoNormalizado === "LIBERADO" || estadoNormalizado === "PRELIMINAR"),
             estado: estadoNormalizado,
-            archivoOriginal: originalFilename,
-            archivoGenerado: versionActual?.publicado?.filename || "",
+            archivoOriginal: cleanOriginalVisibleName(originalFilename),
+            archivoGenerado: visibleProcessedName({ ...item, estado: estadoNormalizado }, versionActual) || versionActual?.publicado?.filename || "",
+            versionesVisibles,
             urlConsulta: portalUrl(),
           };
         })(),
@@ -668,15 +715,81 @@ exports.archivoAdmin = async (req, res) => {
   }
 };
 
+exports.descargarOficialesReporte = async (req, res) => {
+  try {
+    const { search = "", codigo = "", planMonitoreo = "", cliente = "", matriz = "", acreditacion = "" } = req.body || {};
+    const filters = [
+      { estado: { $in: ["LIBERADO", "DISPONIBLE"] } },
+      { papelera: { $ne: true } },
+    ];
+
+    if (search) {
+      filters.push({
+        $or: [
+          { codigo: { $regex: search, $options: "i" } },
+          { planMonitoreo: { $regex: search, $options: "i" } },
+          { cliente: { $regex: search, $options: "i" } },
+          { matriz: { $regex: search, $options: "i" } },
+          { acreditacion: { $regex: search, $options: "i" } },
+        ],
+      });
+    }
+    if (codigo) filters.push({ codigo: { $regex: codigo, $options: "i" } });
+    if (planMonitoreo) filters.push({ planMonitoreo: { $regex: planMonitoreo, $options: "i" } });
+    if (cliente) filters.push({ cliente: { $regex: cliente, $options: "i" } });
+    if (matriz) filters.push({ matriz: { $regex: matriz, $options: "i" } });
+    if (acreditacion) filters.push({ acreditacion: normalize(acreditacion) });
+
+    const informes = await Informe.find(filters.length ? { $and: filters } : {}).sort({ codigo: 1 }).limit(5000).lean();
+    if (!informes.length) return res.status(404).json({ message: "No se encontraron informes oficiales para descargar" });
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="informes_oficiales_${new Date().toISOString().slice(0, 10)}.zip"`);
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.on("error", (error) => {
+      throw error;
+    });
+    archive.pipe(res);
+
+    let added = 0;
+    const omitted = [];
+    for (const report of informes) {
+      const version = [...(report.versiones || [])].reverse().find((item) =>
+        item.tipo === "OFICIAL" || report.estado === "LIBERADO" || report.estado === "DISPONIBLE"
+      );
+      const filePath = version?.publicado?.path ? assertInsideStorage(version.publicado.path) : "";
+      if (!filePath) {
+        omitted.push(`${report.codigo}: sin archivo oficial`);
+        continue;
+      }
+
+      try {
+        await fs.access(filePath);
+        archive.file(filePath, { name: visibleProcessedName(report, version) || `IE_${safeSegment(report.codigo)}.pdf` });
+        added += 1;
+      } catch (_) {
+        omitted.push(`${report.codigo}: archivo no encontrado`);
+      }
+    }
+
+    if (omitted.length) archive.append(omitted.join("\n"), { name: "omitidos.txt" });
+    if (!added) archive.append("No se encontraron archivos oficiales fisicos para los filtros seleccionados.", { name: "sin_archivos.txt" });
+    await archive.finalize();
+  } catch (error) {
+    if (!res.headersSent) res.status(500).json({ message: error.message });
+  }
+};
+
 exports.consultar = async (req, res) => {
   try {
     const codigo = normalize(req.body.codigo);
     const idAcceso = normalize(req.body.idAcceso || req.body.claveAcceso);
-    const report = await Informe.findOne({ codigo, estado: { $in: ["LIBERADO", "DISPONIBLE"] }, papelera: { $ne: true } });
+    const report = await Informe.findOne({ codigo, estado: { $in: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] }, papelera: { $ne: true } });
     if (!report || !(await bcrypt.compare(idAcceso || "", report.claveAccesoHash))) {
       return res.status(404).json({ message: "Informe o ID de acceso no válidos" });
     }
-    res.json({ codigo: report.codigo, idAcceso: report.idAcceso, version: report.versionActual, viewToken: createViewToken(report) });
+    res.json({ codigo: report.codigo, idAcceso: report.idAcceso, estado: report.estado === "DISPONIBLE" ? "LIBERADO" : report.estado, tipoVersion: report.tipoVersion, version: report.versionActual, viewToken: createViewToken(report) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -686,7 +799,7 @@ exports.archivoPublico = async (req, res) => {
   try {
     const payload = verifyViewToken(req.query.token);
     if (!payload) return res.status(403).json({ message: "Acceso vencido o no válido" });
-    const report = await Informe.findOne({ _id: payload.id, estado: { $in: ["LIBERADO", "DISPONIBLE"] }, papelera: { $ne: true } });
+    const report = await Informe.findOne({ _id: payload.id, estado: { $in: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] }, papelera: { $ne: true } });
     if (!report || report.versionActual !== payload.version) return res.status(404).json({ message: "Informe no disponible" });
     const version = report.versiones.find((item) => item.numero === report.versionActual);
     const filePath = assertInsideStorage(version?.publicado?.path || "");

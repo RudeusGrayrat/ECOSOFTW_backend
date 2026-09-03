@@ -7,7 +7,7 @@ const Permission = require("../src/Models/Herramientas/Permission");
 const User = require("../src/Models/Herramientas/User");
 
 const adminUserName = process.env.SEED_ADMIN_USER || "MiguelAdmin1";
-const permissionNames = ["VER", "CREAR", "EDITAR", "ELIMINAR", "APROBAR", "DESAPROBAR", "REPORTAR"];
+const permissionNames = ["VER", "CREAR", "EDITAR", "ELIMINAR", "APROBAR", "DESAPROBAR", "REPORTAR", "ENVIAR"];
 const modules = [
   {
     name: "HERRAMIENTAS",

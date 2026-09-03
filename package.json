@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js",
+    "start": "nodemon index.js",
     "seed:system-access": "node scripts/seed-system-access.js",
     "drop:informes-id-index": "node scripts/drop-informe-idacceso-unique-index.js",
     "backfill:informes-metadata:dry": "node scripts/backfill-informes-metadata.js",
@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "archiver": "^7.0.1",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
     "cloudinary": "^2.8.0",
