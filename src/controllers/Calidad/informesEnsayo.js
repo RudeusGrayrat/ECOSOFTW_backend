@@ -45,11 +45,11 @@ const escapeHtml = (value = "") => value.toString()
 const cm = (value) => value * 28.3464567;
 const selloLayout = {
   qrX: cm(6.14),
-  qrTop: cm(21.99),
+  qrY: cm(3.55),
   qrSize: cm(3.5),
-  idTop: cm(25.59),
+  idGap: cm(0.35),
   firmaX: cm(10.45),
-  firmaTop: cm(21.51),
+  firmaY: cm(3.1),
   firmaSize: cm(5),
 };
 
@@ -253,11 +253,11 @@ async function processPdf(source, report, options = {}) {
     const qr = await QRCode.toDataURL(portalUrl(), { margin: 1, width: 280 });
     const qrImage = await pdf.embedPng(qr);
     const qrX = selloLayout.qrX;
-    const qrY = firstPage.getHeight() - selloLayout.qrTop - selloLayout.qrSize;
+    const qrY = selloLayout.qrY;
     const qrSize = selloLayout.qrSize;
     const idText = `ID: ${report.idAcceso}`;
     const idX = qrX + ((qrSize - font.widthOfTextAtSize(idText, 11)) / 2);
-    const idY = firstPage.getHeight() - selloLayout.idTop;
+    const idY = qrY - selloLayout.idGap;
 
     firstPage.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 24, color: rgb(1, 1, 1), opacity: 0.92 });
     firstPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
@@ -272,10 +272,9 @@ async function processPdf(source, report, options = {}) {
     const scale = Math.min(selloLayout.firmaSize / signatureImage.width, selloLayout.firmaSize / signatureImage.height);
     const signatureWidth = signatureImage.width * scale;
     const signatureHeight = signatureImage.height * scale;
-    const firmaY = firstPage.getHeight() - selloLayout.firmaTop - selloLayout.firmaSize;
     firstPage.drawImage(signatureImage, {
       x: selloLayout.firmaX + ((selloLayout.firmaSize - signatureWidth) / 2),
-      y: firmaY + ((selloLayout.firmaSize - signatureHeight) / 2),
+      y: selloLayout.firmaY + ((selloLayout.firmaSize - signatureHeight) / 2),
       width: signatureWidth,
       height: signatureHeight,
     });
