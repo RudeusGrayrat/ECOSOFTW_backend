@@ -21,9 +21,9 @@ const modules = [
     ],
   },
   {
-    name: "OPERACIONES",
-    slug: "operaciones",
-    icon: "OPERACIONES.svg",
+    name: "CALIDAD",
+    slug: "calidad",
+    icon: "CALIDAD.svg",
     order: 2,
     submodules: [
       { name: "INFORMES DE ENSAYO", slug: "informes de ensayo", order: 1 },
@@ -43,8 +43,9 @@ async function upsertPermission(name) {
 }
 
 async function upsertModule(moduleData) {
+  const legacyNames = moduleData.name === "CALIDAD" ? ["OPERACIONES"] : [];
   return Module.findOneAndUpdate(
-    { name: moduleData.name },
+    { $or: [{ name: moduleData.name }, { slug: moduleData.slug }, ...legacyNames.map((name) => ({ name }))] },
     {
       $set: {
         name: moduleData.name,
@@ -59,8 +60,9 @@ async function upsertModule(moduleData) {
 }
 
 async function upsertSubmodule(moduleDoc, submoduleData) {
+  const legacyModules = moduleDoc.name === "CALIDAD" ? ["OPERACIONES"] : [];
   return Submodule.findOneAndUpdate(
-    { name: submoduleData.name, module: moduleDoc.name },
+    { name: submoduleData.name, module: { $in: [moduleDoc.name, ...legacyModules] } },
     {
       $set: {
         name: submoduleData.name,
@@ -78,8 +80,9 @@ async function upsertSubmodule(moduleDoc, submoduleData) {
 function upsertUserAccess(user, moduleDoc, submoduleDoc) {
   const moduleName = normalize(moduleDoc.name);
   const submoduleName = normalize(submoduleDoc.name);
+  const compatibleModuleNames = moduleName === "CALIDAD" ? ["CALIDAD", "OPERACIONES"] : [moduleName];
   const index = user.modules.findIndex(
-    (item) => normalize(item.name) === moduleName && normalize(item.submodule?.name || "") === submoduleName
+    (item) => compatibleModuleNames.includes(normalize(item.name)) && normalize(item.submodule?.name || "") === submoduleName
   );
 
   const access = {

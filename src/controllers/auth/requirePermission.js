@@ -1,8 +1,9 @@
 const normalize = (value) => (value || "").toString().trim().toUpperCase();
 
 module.exports = (moduleName, submodule, permission) => (req, res, next) => {
+  const allowedModuleNames = normalize(moduleName) === "CALIDAD" ? ["CALIDAD", "OPERACIONES"] : [normalize(moduleName)];
   const match = (req.user.modules || []).find((entry) =>
-    normalize(entry.name) === normalize(moduleName) &&
+    allowedModuleNames.includes(normalize(entry.name)) &&
     normalize(entry.submodule?.name) === normalize(submodule)
   );
   if (!match) return res.status(403).json({ message: "No tienes acceso a este submódulo" });

@@ -1,0 +1,28 @@
+const { Router } = require("express");
+const requireAuth = require("../../controllers/auth/requireAuth");
+const requirePermission = require("../../controllers/auth/requirePermission");
+const informes = require("../../controllers/Calidad/informesEnsayo");
+const router = Router();
+
+router.get("/informes-ensayo", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "VER"), informes.listar);
+router.get("/informes-ensayo/reportes/oficiales", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "REPORTAR"), informes.listarOficialesReporte);
+router.post("/informes-ensayo/reportes/oficiales", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "REPORTAR"), informes.descargarOficialesReporte);
+router.post("/informes-ensayo/bulk/descargar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "REPORTAR"), informes.descargarSeleccionados);
+router.post("/informes-ensayo/bulk/aprobar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobarMasivo);
+router.post("/informes-ensayo/bulk/liberar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ENVIAR"), informes.liberarMasivo);
+router.get("/informes-ensayo/configuracion", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "VER"), informes.configuracion);
+router.post("/informes-ensayo/configuracion/firma", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.uploadAsset, informes.actualizarFirma);
+router.delete("/informes-ensayo/configuracion/firma", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.eliminarFirma);
+router.post("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.uploadAsset, informes.actualizarMarcaAgua);
+router.delete("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.eliminarMarcaAgua);
+router.post("/informes-ensayo/procesar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "CREAR"), informes.upload, informes.procesar);
+router.get("/informes-ensayo/:id/archivo", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "VER"), informes.archivoAdmin);
+router.post("/informes-ensayo/:id/aprobar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobar);
+router.post("/informes-ensayo/:id/liberar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ENVIAR"), informes.liberar);
+router.post("/informes-ensayo/:id/papelera", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.enviarPapelera);
+router.post("/informes-ensayo/:id/restablecer", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.restablecer);
+router.post("/informes-ensayo/:id/publicar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobar);
+router.post("/informes-ensayo/:id/anular", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "DESAPROBAR"), informes.enviarPapelera);
+router.post("/publico/informes-ensayo", informes.consultar);
+router.get("/publico/informes-ensayo/archivo", informes.archivoPublico);
+module.exports = router;

@@ -9,8 +9,8 @@ const routeMap = [
   { pattern: /^\/api\/herramientas\/.*Usuarios/i, module: "HERRAMIENTAS", submodule: "USUARIOS" },
   { pattern: /^\/api\/herramientas\/.*Permissions|^\/api\/herramientas\/.*Permission/i, module: "HERRAMIENTAS", submodule: "PERMISOS" },
   { pattern: /^\/api\/herramientas\/.*Modules?|^\/api\/herramientas\/.*SubModules?|^\/api\/herramientas\/.*Modulo/i, module: "HERRAMIENTAS", submodule: "MODULOS Y SUBMODULOS" },
-  { pattern: /^\/api\/operaciones\/informes-ensayo\/configuracion/i, module: "OPERACIONES", submodule: "CONFIGURACION" },
-  { pattern: /^\/api\/operaciones\/informes-ensayo/i, module: "OPERACIONES", submodule: "INFORMES DE ENSAYO" },
+  { pattern: /^\/api\/(?:calidad|operaciones)\/informes-ensayo\/configuracion/i, module: "CALIDAD", submodule: "CONFIGURACION" },
+  { pattern: /^\/api\/(?:calidad|operaciones)\/informes-ensayo/i, module: "CALIDAD", submodule: "INFORMES DE ENSAYO" },
 ];
 
 const actionByMethod = {

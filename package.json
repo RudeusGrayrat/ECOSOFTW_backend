@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon index.js",
     "seed:system-access": "node scripts/seed-system-access.js",
+    "migrate:calidad-module": "node scripts/migrate-operaciones-to-calidad.js",
     "drop:informes-id-index": "node scripts/drop-informe-idacceso-unique-index.js",
     "backfill:informes-metadata:dry": "node scripts/backfill-informes-metadata.js",
     "backfill:informes-metadata": "node scripts/backfill-informes-metadata.js --write",

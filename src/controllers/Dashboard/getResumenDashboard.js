@@ -5,7 +5,7 @@ const Module = require("../../Models/Herramientas/Modulo");
 const Permission = require("../../Models/Herramientas/Permission");
 const Submodule = require("../../Models/Herramientas/Submodulo");
 const User = require("../../Models/Herramientas/User");
-const InformeEnsayo = require("../../Models/Operaciones/InformeEnsayo");
+const InformeEnsayo = require("../../Models/Calidad/InformeEnsayo");
 
 const monthStart = (monthsBack = 11) => {
   const date = new Date();

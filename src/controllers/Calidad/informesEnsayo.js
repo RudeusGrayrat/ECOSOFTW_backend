@@ -5,13 +5,14 @@ const os = require("os");
 const path = require("path");
 const { promisify } = require("util");
 const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 const multer = require("multer");
 const nodemailer = require("nodemailer");
 const archiver = require("archiver");
 const QRCode = require("qrcode");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
-const Informe = require("../../Models/Operaciones/InformeEnsayo");
-const InformeConfig = require("../../Models/Operaciones/InformeEnsayoConfig");
+const Informe = require("../../Models/Calidad/InformeEnsayo");
+const InformeConfig = require("../../Models/Calidad/InformeEnsayoConfig");
 const escapeRegExp = require("../../utils/escapeRegex");
 
 const execFileAsync = promisify(execFile);
@@ -43,17 +44,24 @@ const escapeHtml = (value = "") => value.toString()
   .replace(/'/g, "&#039;");
 const cm = (value) => value * 28.3464567;
 const selloLayout = {
-  qrX: cm(5.75),
-  qrY: cm(3.55),
+  qrX: cm(6.14),
+  qrTop: cm(21.99),
   qrSize: cm(3.5),
-  idGap: cm(0.35),
-  firmaX: cm(10.25),
-  firmaY: cm(3.1),
+  idTop: cm(25.59),
+  firmaX: cm(10.45),
+  firmaTop: cm(21.51),
   firmaSize: cm(5),
 };
 
 const tiposMarcaAgua = ["INACAL", "NAC", "SIN_ACREDITACION", "VERSION_PRELIMINAR"];
 const tiposAcreditacion = ["INACAL", "NAC", "SIN_ACREDITACION"];
+
+const sanitizeObjectIds = (ids = []) => {
+  const uniqueIds = Array.from(new Set((Array.isArray(ids) ? ids : []).map((id) => id?.toString()).filter(Boolean)));
+  const invalidIds = uniqueIds.filter((id) => !mongoose.isValidObjectId(id));
+  const validIds = uniqueIds.filter((id) => mongoose.isValidObjectId(id));
+  return { validIds, invalidIds };
+};
 
 const detectCode = (filename = "") => {
   const baseName = path.basename(filename, path.extname(filename)).trim().toUpperCase();
@@ -245,11 +253,11 @@ async function processPdf(source, report, options = {}) {
     const qr = await QRCode.toDataURL(portalUrl(), { margin: 1, width: 280 });
     const qrImage = await pdf.embedPng(qr);
     const qrX = selloLayout.qrX;
-    const qrY = selloLayout.qrY;
+    const qrY = firstPage.getHeight() - selloLayout.qrTop - selloLayout.qrSize;
     const qrSize = selloLayout.qrSize;
     const idText = `ID: ${report.idAcceso}`;
     const idX = qrX + ((qrSize - font.widthOfTextAtSize(idText, 11)) / 2);
-    const idY = qrY - selloLayout.idGap;
+    const idY = firstPage.getHeight() - selloLayout.idTop;
 
     firstPage.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 24, color: rgb(1, 1, 1), opacity: 0.92 });
     firstPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
@@ -264,9 +272,10 @@ async function processPdf(source, report, options = {}) {
     const scale = Math.min(selloLayout.firmaSize / signatureImage.width, selloLayout.firmaSize / signatureImage.height);
     const signatureWidth = signatureImage.width * scale;
     const signatureHeight = signatureImage.height * scale;
+    const firmaY = firstPage.getHeight() - selloLayout.firmaTop - selloLayout.firmaSize;
     firstPage.drawImage(signatureImage, {
       x: selloLayout.firmaX + ((selloLayout.firmaSize - signatureWidth) / 2),
-      y: selloLayout.firmaY + ((selloLayout.firmaSize - signatureHeight) / 2),
+      y: firmaY + ((selloLayout.firmaSize - signatureHeight) / 2),
       width: signatureWidth,
       height: signatureHeight,
     });
@@ -801,15 +810,20 @@ exports.liberar = async (req, res) => {
 
 exports.aprobarMasivo = async (req, res) => {
   try {
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-    if (!ids.length) return res.status(400).json({ message: "Selecciona al menos un informe para aprobar" });
+    const { validIds, invalidIds } = sanitizeObjectIds(req.body?.ids);
+    if (!validIds.length) return res.status(400).json({ message: "Selecciona al menos un informe válido para aprobar" });
+    if (invalidIds.length) return res.status(400).json({ message: `Hay IDs de informe no válidos: ${invalidIds.join(", ")}` });
 
-    const reports = await Informe.find({ _id: { $in: ids }, papelera: { $ne: true } });
+    const reports = await Informe.find({ _id: { $in: validIds }, papelera: { $ne: true } });
     const resultado = { procesados: 0, omitidos: [] };
+    if (reports.length !== validIds.length) {
+      resultado.omitidos.push(`${validIds.length - reports.length} informes no encontrados o en papelera`);
+    }
     for (const report of reports) {
       try {
         if (!report.versionActual) throw new Error("sin versión cargada");
-        if (report.estado === "PRELIMINAR" || report.estado === "LIBERADO") throw new Error("ya tiene visto bueno");
+        if (report.estado !== "BORRADOR") throw new Error(`no está en BORRADOR, estado actual: ${report.estado}`);
+        if (report.vistoBuenoJefatura) throw new Error("ya tiene visto bueno");
         await regenerarVersion(report, req, "PRELIMINAR", "VERSION_PRELIMINAR", false, false);
         report.estado = "PRELIMINAR";
         report.tipoVersion = "PRELIMINAR";
@@ -834,13 +848,18 @@ exports.aprobarMasivo = async (req, res) => {
 
 exports.liberarMasivo = async (req, res) => {
   try {
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-    if (!ids.length) return res.status(400).json({ message: "Selecciona al menos un informe para liberar" });
+    const { validIds, invalidIds } = sanitizeObjectIds(req.body?.ids);
+    if (!validIds.length) return res.status(400).json({ message: "Selecciona al menos un informe válido para liberar" });
+    if (invalidIds.length) return res.status(400).json({ message: `Hay IDs de informe no válidos: ${invalidIds.join(", ")}` });
 
-    const reports = await Informe.find({ _id: { $in: ids }, papelera: { $ne: true } }).populate("clienteId", "cliente correoElectronico");
+    const reports = await Informe.find({ _id: { $in: validIds }, papelera: { $ne: true } }).populate("clienteId", "cliente correoElectronico");
     const resultado = { procesados: 0, correosEnviados: 0, omitidos: [], correosNoEnviados: [] };
+    if (reports.length !== validIds.length) {
+      resultado.omitidos.push(`${validIds.length - reports.length} informes no encontrados o en papelera`);
+    }
     for (const report of reports) {
       try {
+        if (report.estado === "LIBERADO" || report.estado === "DISPONIBLE") throw new Error("ya está liberado");
         if (!report.vistoBuenoJefatura && report.estado !== "PRELIMINAR") throw new Error("necesita visto bueno de jefatura");
         await regenerarVersion(report, req, "OFICIAL", report.acreditacion || report.plantilla?.tipo || "SIN_ACREDITACION", true, true);
         report.estado = "LIBERADO";

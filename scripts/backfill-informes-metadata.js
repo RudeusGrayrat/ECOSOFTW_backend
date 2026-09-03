@@ -4,7 +4,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
-const Informe = require("../src/Models/Operaciones/InformeEnsayo");
+const Informe = require("../src/Models/Calidad/InformeEnsayo");
 
 const write = process.argv.includes("--write");
 

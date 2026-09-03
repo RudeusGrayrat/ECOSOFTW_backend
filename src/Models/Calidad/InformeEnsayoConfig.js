@@ -20,4 +20,4 @@ const informeEnsayoConfigSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-module.exports = mongoose.model("operaciones_informes_ensayo_config", informeEnsayoConfigSchema);
+module.exports = mongoose.model("calidad_informes_ensayo_config", informeEnsayoConfigSchema, "operaciones_informes_ensayo_configs");

@@ -6,7 +6,7 @@ const fsSync = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
 const mongoose = require("mongoose");
-const Informe = require("../src/Models/Operaciones/InformeEnsayo");
+const Informe = require("../src/Models/Calidad/InformeEnsayo");
 
 const sqlPath = path.resolve(process.env.QRENSAYO_SQL_PATH || path.join(__dirname, "..", "..", "QRENSAYO", "bryyaurh_informedeensayo.sql"));
 const sourcePdfDir = path.resolve(process.env.QRENSAYO_PDF_DIR || path.join(__dirname, "..", "..", "QRENSAYO", "public", "archivos", "certificados"));

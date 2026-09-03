@@ -55,4 +55,4 @@ const informeEnsayoSchema = new mongoose.Schema({
   migracion: migracionSchema,
 }, { timestamps: true });
 
-module.exports = mongoose.model("operaciones_informes_ensayo", informeEnsayoSchema);
+module.exports = mongoose.model("calidad_informes_ensayo", informeEnsayoSchema, "operaciones_informes_ensayos");
