@@ -310,16 +310,24 @@ async function enviarCorreoLiberacion(report, req, options = {}) {
   const correoUsuario = (req.user?.correoElectronico || "").trim().toLowerCase();
   if (!correoUsuario) throw new Error("Tu usuario no tiene un correo configurado para enviar mensajes");
 
-  const smtpUser = process.env.EMAIL_CALIDAD;
-  const smtpPass = process.env.PASS_CALIDAD;
+  const smtpUser = process.env.EMAIL_CALIDAD || process.env.EMAIL_ECOLOGY;
+  const smtpPass = process.env.PASS_CALIDAD || process.env.PASS_ECOLOGY;
   const smtpHost = process.env.SMTP_CALIDAD || process.env.SMTP_ECOLOGY;
   if (!smtpUser || !smtpPass || !smtpHost) throw new Error("No está configurado el correo de Calidad para enviar informes");
+  const smtpPort = Number(process.env.SMTP_CALIDAD_PORT || process.env.SMTP_PORT || 465);
+  const smtpSecure = process.env.SMTP_CALIDAD_SECURE || process.env.SMTP_SECURE;
 
   const transporter = nodemailer.createTransport({
     host: smtpHost,
-    port: Number(process.env.SMTP_CALIDAD_PORT || process.env.SMTP_PORT || 465),
-    secure: String(process.env.SMTP_CALIDAD_SECURE || process.env.SMTP_SECURE || "true") !== "false",
+    port: smtpPort,
+    secure: smtpSecure ? String(smtpSecure) !== "false" : smtpPort === 465,
     auth: { user: smtpUser, pass: smtpPass },
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 5000),
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 5000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 15000),
+    tls: {
+      rejectUnauthorized: String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || "true") !== "false",
+    },
   });
 
   const asunto = options.asunto || `Informe de ensayo ${report.codigo} liberado`;
@@ -760,7 +768,12 @@ exports.liberar = async (req, res) => {
     res.json({ message: correoEnviado ? "Informe liberado y correo enviado correctamente" : "Informe liberado correctamente", type: "Correcto", data: report, urlConsulta: portalUrl() });
   } catch (error) {
     console.error("Error al liberar informe:", error);
-    res.status(500).json({ message: error.message });
+    const smtpMessages = {
+      ETIMEDOUT: "No se pudo conectar al servidor SMTP de Calidad desde este servidor. Revisa si el VPS tiene salida al puerto SMTP o prueba con el puerto 587.",
+      ECONNREFUSED: "El servidor SMTP rechazó la conexión desde el VPS. Revisa host, puerto o firewall.",
+      EAUTH: "El correo de Calidad rechazó el usuario o la contraseña configurados.",
+    };
+    res.status(500).json({ message: smtpMessages[error.code] || error.message });
   }
 };
 
