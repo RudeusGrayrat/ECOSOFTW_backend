@@ -434,28 +434,67 @@ exports.eliminarMarcaAgua = async (req, res) => {
 };
 
 exports.listar = async (req, res) => {
-  const { page = 0, limit = 10, search = "", papelera = "false" } = req.query;
+  const {
+    page = 0,
+    limit = 10,
+    search = "",
+    papelera = "false",
+    codigo = "",
+    planMonitoreo = "",
+    cliente = "",
+    matriz = "",
+    idAcceso = "",
+    acreditacion = "",
+    estado = "",
+    vistoBuenoJefatura = "",
+    sortField = "createdAt",
+    sortOrder = -1,
+  } = req.query;
   try {
+    const regex = (value) => ({ $regex: escapeRegExp(value), $options: "i" });
     const searchable = search
       ? {
         $or: [
-          { codigo: { $regex: search, $options: "i" } },
-          { planMonitoreo: { $regex: search, $options: "i" } },
-          { cliente: { $regex: search, $options: "i" } },
-          { matriz: { $regex: search, $options: "i" } },
-          { idAcceso: { $regex: search, $options: "i" } },
-          { estado: { $regex: search, $options: "i" } },
-          { acreditacion: { $regex: search, $options: "i" } },
+          { codigo: regex(search) },
+          { planMonitoreo: regex(search) },
+          { cliente: regex(search) },
+          { matriz: regex(search) },
+          { idAcceso: regex(search) },
+          { estado: regex(search) },
+          { acreditacion: regex(search) },
         ],
       }
       : {};
     const papeleraFilter = papelera === "true"
       ? { papelera: true }
       : { $or: [{ papelera: false }, { papelera: { $exists: false } }] };
-    const filter = search ? { $and: [searchable, papeleraFilter] } : papeleraFilter;
+    const filters = [papeleraFilter];
+    if (search) filters.push(searchable);
+    if (codigo) filters.push({ codigo: regex(codigo) });
+    if (planMonitoreo) filters.push({ planMonitoreo: regex(planMonitoreo) });
+    if (cliente) filters.push({ cliente: regex(cliente) });
+    if (matriz) filters.push({ matriz: regex(matriz) });
+    if (idAcceso) filters.push({ idAcceso: regex(idAcceso) });
+    if (acreditacion) filters.push({ acreditacion: normalize(acreditacion) });
+    if (estado) filters.push({ estado: normalize(estado) === "LIBERADO" ? { $in: ["LIBERADO", "DISPONIBLE"] } : normalize(estado) });
+    if (vistoBuenoJefatura === "SI") {
+      filters.push({ $or: [{ vistoBuenoJefatura: true }, { estado: { $in: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] } }] });
+    }
+    if (vistoBuenoJefatura === "NO") {
+      filters.push({
+        $and: [
+          { $or: [{ vistoBuenoJefatura: false }, { vistoBuenoJefatura: { $exists: false } }] },
+          { estado: { $nin: ["PRELIMINAR", "LIBERADO", "DISPONIBLE"] } },
+        ],
+      });
+    }
+    const filter = { $and: filters };
+    const sortableFields = ["codigo", "planMonitoreo", "matriz", "idAcceso", "acreditacion", "vistoBuenoJefatura", "estado", "createdAt"];
+    const sortKey = sortableFields.includes(sortField) ? sortField : "createdAt";
+    const sortDirection = Number(sortOrder) === 1 ? 1 : -1;
     const [data, total] = await Promise.all([
       Informe.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ [sortKey]: sortDirection })
         .skip(Number(page) * Number(limit))
         .limit(Number(limit))
         .populate("proyectoId clienteId", "nombre cliente correoElectronico")
@@ -666,6 +705,7 @@ exports.liberar = async (req, res) => {
     await report.save();
     res.json({ message: correoEnviado ? "Informe liberado y correo enviado correctamente" : "Informe liberado correctamente", type: "Correcto", data: report, urlConsulta: portalUrl() });
   } catch (error) {
+    console.error("Error al liberar informe:", error);
     res.status(500).json({ message: error.message });
   }
 };
