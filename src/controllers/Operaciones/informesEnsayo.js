@@ -758,14 +758,36 @@ exports.liberar = async (req, res) => {
     report.estado = "LIBERADO";
     report.tipoVersion = "OFICIAL";
     audit(report, req, "LIBERADO", "Informe oficial liberado para consulta publica");
-    const correoEnviado = await enviarCorreoLiberacion(report, req, {
-      correoCliente: req.body?.correoCliente || report.clienteId?.correoElectronico,
-      asunto: req.body?.asunto,
-      mensaje: req.body?.mensaje,
-    });
-    if (correoEnviado) audit(report, req, "CORREO ENVIADO", `Correo de liberacion enviado a ${req.body?.correoCliente || report.clienteId?.correoElectronico}`);
     await report.save();
-    res.json({ message: correoEnviado ? "Informe liberado y correo enviado correctamente" : "Informe liberado correctamente", type: "Correcto", data: report, urlConsulta: portalUrl() });
+    let correoEnviado = false;
+    let correoError = "";
+    if (req.body?.enviarCorreo) {
+      try {
+        correoEnviado = await enviarCorreoLiberacion(report, req, {
+          correoCliente: req.body?.correoCliente || report.clienteId?.correoElectronico,
+          asunto: req.body?.asunto,
+          mensaje: req.body?.mensaje,
+        });
+        if (correoEnviado) {
+          audit(report, req, "CORREO ENVIADO", `Correo de liberacion enviado a ${req.body?.correoCliente || report.clienteId?.correoElectronico}`);
+          await report.save();
+        }
+      } catch (error) {
+        correoError = error.message;
+        audit(report, req, "CORREO NO ENVIADO", correoError);
+        await report.save();
+      }
+    }
+    res.json({
+      message: correoEnviado
+        ? "Informe liberado y correo enviado correctamente"
+        : correoError
+          ? `Informe liberado correctamente, pero no se pudo enviar el correo: ${correoError}`
+          : "Informe liberado correctamente",
+      type: correoError ? "Advertencia" : "Correcto",
+      data: report,
+      urlConsulta: portalUrl(),
+    });
   } catch (error) {
     console.error("Error al liberar informe:", error);
     const smtpMessages = {
@@ -774,6 +796,89 @@ exports.liberar = async (req, res) => {
       EAUTH: "El correo de Calidad rechazó el usuario o la contraseña configurados.",
     };
     res.status(500).json({ message: smtpMessages[error.code] || error.message });
+  }
+};
+
+exports.aprobarMasivo = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ message: "Selecciona al menos un informe para aprobar" });
+
+    const reports = await Informe.find({ _id: { $in: ids }, papelera: { $ne: true } });
+    const resultado = { procesados: 0, omitidos: [] };
+    for (const report of reports) {
+      try {
+        if (!report.versionActual) throw new Error("sin versión cargada");
+        if (report.estado === "PRELIMINAR" || report.estado === "LIBERADO") throw new Error("ya tiene visto bueno");
+        await regenerarVersion(report, req, "PRELIMINAR", "VERSION_PRELIMINAR", false, false);
+        report.estado = "PRELIMINAR";
+        report.tipoVersion = "PRELIMINAR";
+        report.vistoBuenoJefatura = true;
+        audit(report, req, "VISTO BUENO JEFATURA", "Aprobación masiva como versión preliminar");
+        await report.save();
+        resultado.procesados += 1;
+      } catch (error) {
+        resultado.omitidos.push(`${report.codigo}: ${error.message}`);
+      }
+    }
+
+    res.json({
+      message: `${resultado.procesados} informes aprobados como versión preliminar`,
+      type: resultado.omitidos.length ? "Advertencia" : "Correcto",
+      ...resultado,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.liberarMasivo = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ message: "Selecciona al menos un informe para liberar" });
+
+    const reports = await Informe.find({ _id: { $in: ids }, papelera: { $ne: true } }).populate("clienteId", "cliente correoElectronico");
+    const resultado = { procesados: 0, correosEnviados: 0, omitidos: [], correosNoEnviados: [] };
+    for (const report of reports) {
+      try {
+        if (!report.vistoBuenoJefatura && report.estado !== "PRELIMINAR") throw new Error("necesita visto bueno de jefatura");
+        await regenerarVersion(report, req, "OFICIAL", report.acreditacion || report.plantilla?.tipo || "SIN_ACREDITACION", true, true);
+        report.estado = "LIBERADO";
+        report.tipoVersion = "OFICIAL";
+        audit(report, req, "LIBERADO", "Liberación masiva como informe oficial");
+        await report.save();
+        resultado.procesados += 1;
+
+        if (req.body?.enviarCorreo) {
+          try {
+            const correoEnviado = await enviarCorreoLiberacion(report, req, {
+              correoCliente: report.clienteId?.correoElectronico || req.body?.correoCliente,
+              asunto: req.body?.asunto || `Informe de ensayo ${report.codigo} liberado`,
+              mensaje: req.body?.mensaje,
+            });
+            if (correoEnviado) {
+              audit(report, req, "CORREO ENVIADO", `Correo de liberación masiva enviado a ${report.clienteId?.correoElectronico || req.body?.correoCliente}`);
+              await report.save();
+              resultado.correosEnviados += 1;
+            }
+          } catch (error) {
+            resultado.correosNoEnviados.push(`${report.codigo}: ${error.message}`);
+            audit(report, req, "CORREO NO ENVIADO", error.message);
+            await report.save();
+          }
+        }
+      } catch (error) {
+        resultado.omitidos.push(`${report.codigo}: ${error.message}`);
+      }
+    }
+
+    res.json({
+      message: `${resultado.procesados} informes liberados correctamente`,
+      type: resultado.omitidos.length || resultado.correosNoEnviados.length ? "Advertencia" : "Correcto",
+      ...resultado,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -822,6 +927,51 @@ exports.archivoAdmin = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+async function appendReportToArchive(archive, report, options = {}) {
+  const version = options.officialOnly
+    ? officialVersionFor(report)
+    : (report.versiones || []).find((item) => item.numero === report.versionActual);
+  const filePath = version?.publicado?.path ? assertInsideStorage(version.publicado.path) : "";
+  if (!filePath) return `${report.codigo}: sin archivo disponible`;
+
+  try {
+    await fs.access(filePath);
+    archive.file(filePath, {
+      name: options.officialOnly
+        ? visibleProcessedName(report, version) || `IE_${safeSegment(report.codigo)}.pdf`
+        : version.publicado.filename || `${safeSegment(report.codigo)}.pdf`,
+    });
+    return "";
+  } catch (_) {
+    return `${report.codigo}: archivo no encontrado`;
+  }
+}
+
+async function sendReportsZip(res, informes, options = {}) {
+  if (!informes.length) return res.status(404).json({ message: "No se encontraron informes para descargar" });
+
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${options.filename || "informes_seleccionados"}.zip"`);
+
+  const archive = archiver("zip", { zlib: { level: 9 } });
+  archive.on("error", (error) => {
+    throw error;
+  });
+  archive.pipe(res);
+
+  let added = 0;
+  const omitted = [];
+  for (const report of informes) {
+    const omitReason = await appendReportToArchive(archive, report, options);
+    if (omitReason) omitted.push(omitReason);
+    else added += 1;
+  }
+
+  if (omitted.length) archive.append(omitted.join("\n"), { name: "omitidos.txt" });
+  if (!added) archive.append("No se encontraron archivos físicos para los informes seleccionados.", { name: "sin_archivos.txt" });
+  await archive.finalize();
+}
 
 function officialReportFilters(params = {}) {
   const { search = "", codigo = "", planMonitoreo = "", cliente = "", matriz = "", acreditacion = "", ids = [] } = params;
@@ -894,39 +1044,24 @@ exports.listarOficialesReporte = async (req, res) => {
 exports.descargarOficialesReporte = async (req, res) => {
   try {
     const informes = await Informe.find(officialReportFilters(req.body || {})).sort({ codigo: 1 }).limit(5000).lean();
-    if (!informes.length) return res.status(404).json({ message: "No se encontraron informes oficiales para descargar" });
-
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="informes_oficiales_${new Date().toISOString().slice(0, 10)}.zip"`);
-
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    archive.on("error", (error) => {
-      throw error;
+    await sendReportsZip(res, informes, {
+      officialOnly: true,
+      filename: `informes_oficiales_${new Date().toISOString().slice(0, 10)}`,
     });
-    archive.pipe(res);
+  } catch (error) {
+    if (!res.headersSent) res.status(500).json({ message: error.message });
+  }
+};
 
-    let added = 0;
-    const omitted = [];
-    for (const report of informes) {
-      const version = officialVersionFor(report);
-      const filePath = version?.publicado?.path ? assertInsideStorage(version.publicado.path) : "";
-      if (!filePath) {
-        omitted.push(`${report.codigo}: sin archivo oficial`);
-        continue;
-      }
-
-      try {
-        await fs.access(filePath);
-        archive.file(filePath, { name: visibleProcessedName(report, version) || `IE_${safeSegment(report.codigo)}.pdf` });
-        added += 1;
-      } catch (_) {
-        omitted.push(`${report.codigo}: archivo no encontrado`);
-      }
-    }
-
-    if (omitted.length) archive.append(omitted.join("\n"), { name: "omitidos.txt" });
-    if (!added) archive.append("No se encontraron archivos oficiales fisicos para los filtros seleccionados.", { name: "sin_archivos.txt" });
-    await archive.finalize();
+exports.descargarSeleccionados = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ message: "Selecciona al menos un informe para descargar" });
+    const informes = await Informe.find({ _id: { $in: ids }, papelera: { $ne: true } }).sort({ codigo: 1 }).limit(5000).lean();
+    await sendReportsZip(res, informes, {
+      officialOnly: false,
+      filename: `informes_seleccionados_${new Date().toISOString().slice(0, 10)}`,
+    });
   } catch (error) {
     if (!res.headersSent) res.status(500).json({ message: error.message });
   }
