@@ -52,6 +52,14 @@ const selloLayout = {
   firmaY: cm(3.1),
   firmaSize: cm(5),
 };
+const firmaPadding = cm(0.1);
+const selloAreaPadding = cm(0.28);
+const selloOccupancy = {
+  renderer: process.env.PDF_RENDERER_PATH || "pdftoppm",
+  dpi: Number(process.env.PDF_RENDERER_DPI || 72),
+  darkThreshold: Number(process.env.PDF_SEAL_DARK_THRESHOLD || 210),
+  maxDarkRatio: Number(process.env.PDF_SEAL_MAX_DARK_RATIO || 0.012),
+};
 
 const tiposMarcaAgua = ["INACAL", "NAC", "SIN_ACREDITACION", "VERSION_PRELIMINAR"];
 const tiposAcreditacion = ["INACAL", "NAC", "SIN_ACREDITACION"];
@@ -209,6 +217,131 @@ function verifyViewToken(token) {
   return { id, version: Number(version) };
 }
 
+function sealBounds() {
+  const minX = Math.min(selloLayout.qrX, selloLayout.firmaX) - selloAreaPadding;
+  const minY = Math.min(selloLayout.qrY - selloLayout.idGap, selloLayout.firmaY) - selloAreaPadding;
+  const maxX = Math.max(selloLayout.qrX + selloLayout.qrSize, selloLayout.firmaX + selloLayout.firmaSize) + selloAreaPadding;
+  const maxY = Math.max(selloLayout.qrY + selloLayout.qrSize, selloLayout.firmaY + selloLayout.firmaSize) + selloAreaPadding;
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function parsePpm(buffer) {
+  let offset = 0;
+  const readToken = () => {
+    while (offset < buffer.length) {
+      const char = String.fromCharCode(buffer[offset]);
+      if (/\s/.test(char)) {
+        offset += 1;
+        continue;
+      }
+      if (char === "#") {
+        while (offset < buffer.length && buffer[offset] !== 10) offset += 1;
+        continue;
+      }
+      break;
+    }
+    const start = offset;
+    while (offset < buffer.length && !/\s/.test(String.fromCharCode(buffer[offset]))) offset += 1;
+    return buffer.toString("ascii", start, offset);
+  };
+
+  const magic = readToken();
+  if (magic !== "P6") throw new Error("Formato PPM no soportado");
+  const width = Number(readToken());
+  const height = Number(readToken());
+  const maxValue = Number(readToken());
+  while (offset < buffer.length && /\s/.test(String.fromCharCode(buffer[offset]))) offset += 1;
+  if (!width || !height || maxValue !== 255) throw new Error("PPM inválido");
+  return { width, height, data: buffer.subarray(offset) };
+}
+
+async function renderPdfPageToPpm(pdfBuffer, pageNumber) {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ecosoft-seal-check-"));
+  const input = path.join(directory, "input.pdf");
+  const outputPrefix = path.join(directory, "page");
+  const output = `${outputPrefix}.ppm`;
+  try {
+    await fs.writeFile(input, pdfBuffer);
+    await execFileAsync(selloOccupancy.renderer, [
+      "-f",
+      String(pageNumber),
+      "-l",
+      String(pageNumber),
+      "-r",
+      String(selloOccupancy.dpi),
+      "-singlefile",
+      "-ppm",
+      input,
+      outputPrefix,
+    ]);
+    return parsePpm(await fs.readFile(output));
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+}
+
+async function isSealAreaAvailable(pdfBuffer, page, pageNumber) {
+  try {
+    const rendered = await renderPdfPageToPpm(pdfBuffer, pageNumber);
+    const { width: pageWidth, height: pageHeight } = page.getSize();
+    const scaleX = rendered.width / pageWidth;
+    const scaleY = rendered.height / pageHeight;
+    const bounds = sealBounds();
+    const xStart = Math.max(0, Math.floor(bounds.x * scaleX));
+    const xEnd = Math.min(rendered.width, Math.ceil((bounds.x + bounds.width) * scaleX));
+    const yStart = Math.max(0, Math.floor((pageHeight - bounds.y - bounds.height) * scaleY));
+    const yEnd = Math.min(rendered.height, Math.ceil((pageHeight - bounds.y) * scaleY));
+    let darkPixels = 0;
+    let totalPixels = 0;
+
+    for (let y = yStart; y < yEnd; y += 1) {
+      for (let x = xStart; x < xEnd; x += 1) {
+        const index = (y * rendered.width + x) * 3;
+        const luminance = (rendered.data[index] * 0.299) + (rendered.data[index + 1] * 0.587) + (rendered.data[index + 2] * 0.114);
+        if (luminance < selloOccupancy.darkThreshold) darkPixels += 1;
+        totalPixels += 1;
+      }
+    }
+
+    return totalPixels ? (darkPixels / totalPixels) <= selloOccupancy.maxDarkRatio : true;
+  } catch (error) {
+    console.warn(`No se pudo validar espacio libre para sello con ${selloOccupancy.renderer}: ${error.message}`);
+    return null;
+  }
+}
+
+async function selectSealPage(pdf) {
+  const pages = pdf.getPages();
+  if (!pages.length) throw new Error("El PDF no tiene páginas para procesar");
+  const inspectionBuffer = Buffer.from(await pdf.save());
+  const firstAvailable = await isSealAreaAvailable(inspectionBuffer, pages[0], 1);
+  if (firstAvailable !== false) return pages[0];
+
+  const lastIndex = pages.length - 1;
+  if (lastIndex > 0) {
+    const lastAvailable = await isSealAreaAvailable(inspectionBuffer, pages[lastIndex], lastIndex + 1);
+    if (lastAvailable !== false) return pages[lastIndex];
+  }
+
+  const { width, height } = pages[0].getSize();
+  const validationPage = pdf.addPage([width, height]);
+  return validationPage;
+}
+
+function drawValidationHeader(page, report, font) {
+  const { width, height } = page.getSize();
+  page.drawText("CONSTANCIA DE VERIFICACION DEL INFORME", {
+    x: cm(2.2),
+    y: height - cm(4),
+    size: 16,
+    font,
+    color: rgb(0.05, 0.22, 0.15),
+  });
+  page.drawText(`Informe: ${report.codigo || ""}`, { x: cm(2.2), y: height - cm(5.1), size: 12, font, color: rgb(0, 0, 0) });
+  page.drawText(`ID de acceso: ${report.idAcceso || ""}`, { x: cm(2.2), y: height - cm(5.9), size: 12, font, color: rgb(0, 0, 0) });
+  page.drawLine({ start: { x: cm(2.2), y: height - cm(6.5) }, end: { x: width - cm(2.2), y: height - cm(6.5) }, thickness: 1, color: rgb(0.1, 0.55, 0.32) });
+}
+
 async function processPdf(source, report, options = {}) {
   const {
     tipoMarcaAgua = report.plantilla?.tipo,
@@ -242,12 +375,10 @@ async function processPdf(source, report, options = {}) {
     pdf = watermarkedPdf;
   }
 
-  const firstPage = pdf.getPages()[0];
-  if (!firstPage) {
-    throw new Error("El PDF no tiene páginas para procesar");
-  }
-
   const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const sealPage = includeAccessSeal || includeFirma ? await selectSealPage(pdf) : null;
+  const sealPageIsAppended = sealPage && pdf.getPages().indexOf(sealPage) === pdf.getPageCount() - 1 && pdf.getPageCount() > originalPdf.getPageCount();
+  if (sealPageIsAppended) drawValidationHeader(sealPage, report, font);
 
   if (includeAccessSeal) {
     const qr = await QRCode.toDataURL(portalUrl(), { margin: 1, width: 280 });
@@ -259,9 +390,9 @@ async function processPdf(source, report, options = {}) {
     const idX = qrX + ((qrSize - font.widthOfTextAtSize(idText, 11)) / 2);
     const idY = qrY - selloLayout.idGap;
 
-    firstPage.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 24, color: rgb(1, 1, 1), opacity: 0.92 });
-    firstPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-    firstPage.drawText(idText, { x: idX, y: idY, size: 11, font, color: rgb(0, 0, 0) });
+    sealPage.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 24, color: rgb(1, 1, 1), opacity: 0.92 });
+    sealPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+    sealPage.drawText(idText, { x: idX, y: idY, size: 11, font, color: rgb(0, 0, 0) });
   }
 
   if (includeFirma && config.firma?.path) {
@@ -269,12 +400,13 @@ async function processPdf(source, report, options = {}) {
     const signatureImage = config.firma.mimetype === "image/png"
       ? await pdf.embedPng(signatureBytes)
       : await pdf.embedJpg(signatureBytes);
-    const scale = Math.min(selloLayout.firmaSize / signatureImage.width, selloLayout.firmaSize / signatureImage.height);
+    const firmaDrawableSize = selloLayout.firmaSize - (firmaPadding * 2);
+    const scale = Math.min(firmaDrawableSize / signatureImage.width, firmaDrawableSize / signatureImage.height);
     const signatureWidth = signatureImage.width * scale;
     const signatureHeight = signatureImage.height * scale;
-    firstPage.drawImage(signatureImage, {
-      x: selloLayout.firmaX + ((selloLayout.firmaSize - signatureWidth) / 2),
-      y: selloLayout.firmaY + ((selloLayout.firmaSize - signatureHeight) / 2),
+    sealPage.drawImage(signatureImage, {
+      x: selloLayout.firmaX + firmaPadding + ((firmaDrawableSize - signatureWidth) / 2),
+      y: selloLayout.firmaY + firmaPadding + ((firmaDrawableSize - signatureHeight) / 2),
       width: signatureWidth,
       height: signatureHeight,
     });
