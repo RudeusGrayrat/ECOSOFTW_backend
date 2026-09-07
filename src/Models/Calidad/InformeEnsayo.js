@@ -16,6 +16,24 @@ const auditSchema = new mongoose.Schema({
   fecha: { type: Date, default: Date.now },
 }, { _id: false });
 
+const observacionSchema = new mongoose.Schema({
+  uid: { type: String, required: true },
+  version: { type: Number, required: true },
+  pagina: { type: Number, required: true, min: 1 },
+  tipo: { type: String, enum: ["COMENTARIO", "RESALTADO", "MARCO", "FLECHA"], required: true },
+  texto: { type: String, trim: true },
+  color: { type: String, default: "#B7F000" },
+  x: { type: Number, required: true, min: 0, max: 1 },
+  y: { type: Number, required: true, min: 0, max: 1 },
+  width: { type: Number, default: 0, min: 0, max: 1 },
+  height: { type: Number, default: 0, min: 0, max: 1 },
+  x2: { type: Number, min: 0, max: 1 },
+  y2: { type: Number, min: 0, max: 1 },
+  creadoPor: { type: mongoose.Schema.Types.ObjectId, ref: "UserEcosoft" },
+  creadoEn: { type: Date, default: Date.now },
+  actualizadoEn: Date,
+}, { _id: false });
+
 const migracionSchema = new mongoose.Schema({
   origen: String,
   legacyId: String,
@@ -42,7 +60,7 @@ const informeEnsayoSchema = new mongoose.Schema({
   clienteId: { type: mongoose.Schema.Types.ObjectId, ref: "comercial_clientes" },
   tokenPublico: { type: String, required: true, unique: true, index: true },
   claveAccesoHash: { type: String, required: true },
-  estado: { type: String, enum: ["BORRADOR", "PRELIMINAR", "LIBERADO", "DISPONIBLE", "NO DISPONIBLE", "ANULADO"], default: "BORRADOR" },
+  estado: { type: String, enum: ["BORRADOR", "OBSERVADO", "PRELIMINAR", "LIBERADO", "DISPONIBLE", "NO DISPONIBLE", "ANULADO"], default: "BORRADOR" },
   tipoVersion: { type: String, enum: ["BORRADOR", "PRELIMINAR", "OFICIAL"], default: "BORRADOR" },
   vistoBuenoJefatura: { type: Boolean, default: false },
   papelera: { type: Boolean, default: false },
@@ -51,6 +69,7 @@ const informeEnsayoSchema = new mongoose.Schema({
   plantilla: { tipo: { type: String, default: "SIN_ACREDITACION" }, firmaUrl: String, marcaAguaUrl: String },
   versionActual: { type: Number, default: 0 },
   versiones: [versionSchema],
+  observaciones: [observacionSchema],
   auditoria: [auditSchema],
   migracion: migracionSchema,
 }, { timestamps: true });

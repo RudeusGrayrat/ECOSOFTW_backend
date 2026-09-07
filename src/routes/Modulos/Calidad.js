@@ -17,6 +17,9 @@ router.post("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requ
 router.delete("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.eliminarMarcaAgua);
 router.post("/informes-ensayo/procesar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "CREAR"), informes.upload, informes.procesar);
 router.get("/informes-ensayo/:id/archivo", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "VER"), informes.archivoAdmin);
+router.get("/informes-ensayo/:id/observaciones", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "VER"), informes.getObservaciones);
+router.post("/informes-ensayo/:id/observaciones", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.guardarObservaciones);
+router.post("/informes-ensayo/:id/observar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.observar);
 router.post("/informes-ensayo/:id/aprobar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobar);
 router.post("/informes-ensayo/:id/liberar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ENVIAR"), informes.liberar);
 router.post("/informes-ensayo/:id/papelera", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.enviarPapelera);

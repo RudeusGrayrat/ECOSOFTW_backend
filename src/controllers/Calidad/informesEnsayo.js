@@ -63,6 +63,7 @@ const selloOccupancy = {
 
 const tiposMarcaAgua = ["INACAL", "NAC", "SIN_ACREDITACION", "VERSION_PRELIMINAR"];
 const tiposAcreditacion = ["INACAL", "NAC", "SIN_ACREDITACION"];
+const tiposObservacion = ["COMENTARIO", "RESALTADO", "MARCO", "FLECHA"];
 
 const sanitizeObjectIds = (ids = []) => {
   const uniqueIds = Array.from(new Set((Array.isArray(ids) ? ids : []).map((id) => id?.toString()).filter(Boolean)));
@@ -76,6 +77,35 @@ const detectCode = (filename = "") => {
   const codeMatch = baseName.match(/^([A-Z]*_?IE_)?(\d{6}(?:-I)?)/i) || baseName.match(/^(\d{6}(?:-I)?)/);
   if (codeMatch) return normalize(codeMatch[2] || codeMatch[1]);
   return "";
+};
+
+const clampUnit = (value, fallback = 0) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(1, Math.max(0, number));
+};
+
+const sanitizeObservaciones = (observaciones = [], versionActual = 0, req) => {
+  if (!Array.isArray(observaciones)) return [];
+  return observaciones
+    .map((item) => ({
+      uid: item.uid || crypto.randomBytes(8).toString("hex"),
+      version: Number(item.version || versionActual),
+      pagina: Math.max(1, Number(item.pagina || 1)),
+      tipo: normalize(item.tipo),
+      texto: (item.texto || "").toString().trim(),
+      color: (item.color || "#B7F000").toString().trim(),
+      x: clampUnit(item.x),
+      y: clampUnit(item.y),
+      width: clampUnit(item.width),
+      height: clampUnit(item.height),
+      x2: item.x2 === undefined ? undefined : clampUnit(item.x2),
+      y2: item.y2 === undefined ? undefined : clampUnit(item.y2),
+      creadoPor: item.creadoPor || actor(req),
+      creadoEn: item.creadoEn || new Date(),
+      actualizadoEn: new Date(),
+    }))
+    .filter((item) => tiposObservacion.includes(item.tipo) && item.version && item.pagina);
 };
 
 const parseInformeFilename = (filename = "") => {
@@ -732,6 +762,7 @@ exports.listar = async (req, res) => {
             archivoOriginal: cleanOriginalVisibleName(originalFilename),
             archivoGenerado: visibleProcessedName({ ...item, estado: estadoNormalizado }, versionActual) || versionActual?.publicado?.filename || "",
             versionesVisibles,
+            observacionesCount: (item.observaciones || []).filter((observacion) => Number(observacion.version) === Number(item.versionActual)).length,
             urlConsulta: portalUrl(),
           };
         })(),
@@ -752,6 +783,9 @@ async function guardarBorrador(req, file, body, metadata = {}) {
   if (!tiposAcreditacion.includes(acreditacion)) throw new Error("Tipo de acreditación no válido");
 
   let report = await Informe.findOne({ codigo });
+  if (report && ["LIBERADO", "DISPONIBLE"].includes(report.estado)) {
+    throw new Error("No se puede reemplazar un informe de ensayo ya liberado. Crea un nuevo código o gestiona una corrección formal fuera de este flujo.");
+  }
   if (report && reemplazar !== "true") {
     return {
       conflict: true,
@@ -875,14 +909,88 @@ exports.aprobar = async (req, res) => {
     if (!report) return res.status(404).json({ message: "Informe no encontrado" });
     if (report.papelera) return res.status(400).json({ message: "Restablece el informe antes de aprobarlo" });
     if (!report.versionActual) return res.status(400).json({ message: "El informe aún no tiene una versión cargada" });
-    if (report.estado === "PRELIMINAR" || report.estado === "LIBERADO") return res.status(400).json({ message: "El informe ya tiene visto bueno de jefatura" });
+    if (report.estado !== "BORRADOR") return res.status(400).json({ message: `Solo se puede aprobar un informe en BORRADOR. Estado actual: ${report.estado}` });
     await regenerarVersion(report, req, "PRELIMINAR", "VERSION_PRELIMINAR", false, false);
+    report.observaciones = (report.observaciones || []).filter((item) => Number(item.version) !== Number(report.versionActual));
     report.estado = "PRELIMINAR";
     report.tipoVersion = "PRELIMINAR";
     report.vistoBuenoJefatura = true;
+    report.markModified("observaciones");
     audit(report, req, "VISTO BUENO JEFATURA", "Borrador aprobado como version preliminar");
     await report.save();
     res.json({ message: "Informe aprobado como versión preliminar", type: "Correcto", data: report, urlConsulta: portalUrl() });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getObservaciones = async (req, res) => {
+  try {
+    const report = await Informe.findById(req.params.id)
+      .select("codigo estado versionActual observaciones")
+      .lean();
+    if (!report) return res.status(404).json({ message: "Informe no encontrado" });
+
+    const version = Number(req.query.version || report.versionActual);
+    const observaciones = (report.observaciones || []).filter((item) => Number(item.version) === version);
+    res.json({
+      codigo: report.codigo,
+      estado: report.estado,
+      version,
+      observaciones,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.guardarObservaciones = async (req, res) => {
+  try {
+    const report = await Informe.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: "Informe no encontrado" });
+    if (report.papelera) return res.status(400).json({ message: "Restablece el informe antes de observarlo" });
+    if (!report.versionActual) return res.status(400).json({ message: "El informe aún no tiene una versión cargada" });
+
+    const version = Number(req.body?.version || report.versionActual);
+    const observaciones = sanitizeObservaciones(req.body?.observaciones || [], version, req);
+    report.observaciones = [
+      ...(report.observaciones || []).filter((item) => Number(item.version) !== version),
+      ...observaciones,
+    ];
+    report.markModified("observaciones");
+    audit(report, req, "OBSERVACIONES ACTUALIZADAS", `${observaciones.length} observación(es) en versión ${version}`);
+    await report.save();
+
+    res.json({ message: "Observaciones guardadas correctamente", type: "Correcto", observaciones });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.observar = async (req, res) => {
+  try {
+    const report = await Informe.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: "Informe no encontrado" });
+    if (report.papelera) return res.status(400).json({ message: "Restablece el informe antes de observarlo" });
+    if (!report.versionActual) return res.status(400).json({ message: "El informe aún no tiene una versión cargada" });
+    if (report.estado === "LIBERADO" || report.estado === "DISPONIBLE") return res.status(400).json({ message: "Un informe liberado no puede observarse" });
+
+    const version = Number(req.body?.version || report.versionActual);
+    const observaciones = sanitizeObservaciones(req.body?.observaciones || [], version, req);
+    if (!observaciones.length) return res.status(400).json({ message: "Registra al menos una observación" });
+
+    report.observaciones = [
+      ...(report.observaciones || []).filter((item) => Number(item.version) !== version),
+      ...observaciones,
+    ];
+    report.estado = "OBSERVADO";
+    report.tipoVersion = "BORRADOR";
+    report.vistoBuenoJefatura = false;
+    report.markModified("observaciones");
+    audit(report, req, "INFORME OBSERVADO", `${observaciones.length} observación(es) registradas en versión ${version}`);
+    await report.save();
+
+    res.json({ message: "Informe observado correctamente", type: "Correcto", data: report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -956,9 +1064,11 @@ exports.aprobarMasivo = async (req, res) => {
         if (report.estado !== "BORRADOR") throw new Error(`no está en BORRADOR, estado actual: ${report.estado}`);
         if (report.vistoBuenoJefatura) throw new Error("ya tiene visto bueno");
         await regenerarVersion(report, req, "PRELIMINAR", "VERSION_PRELIMINAR", false, false);
+        report.observaciones = (report.observaciones || []).filter((item) => Number(item.version) !== Number(report.versionActual));
         report.estado = "PRELIMINAR";
         report.tipoVersion = "PRELIMINAR";
         report.vistoBuenoJefatura = true;
+        report.markModified("observaciones");
         audit(report, req, "VISTO BUENO JEFATURA", "Aprobación masiva como versión preliminar");
         await report.save();
         resultado.procesados += 1;
