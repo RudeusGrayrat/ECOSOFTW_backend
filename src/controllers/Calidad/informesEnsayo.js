@@ -783,9 +783,7 @@ async function guardarBorrador(req, file, body, metadata = {}) {
   if (!tiposAcreditacion.includes(acreditacion)) throw new Error("Tipo de acreditación no válido");
 
   let report = await Informe.findOne({ codigo });
-  if (report && ["LIBERADO", "DISPONIBLE"].includes(report.estado)) {
-    throw new Error("No se puede reemplazar un informe de ensayo ya liberado. Crea un nuevo código o gestiona una corrección formal fuera de este flujo.");
-  }
+  const previousState = report?.estado;
   if (report && reemplazar !== "true") {
     return {
       conflict: true,
@@ -835,7 +833,12 @@ async function guardarBorrador(req, file, body, metadata = {}) {
     publicado: { path: processedPath, filename: processedFilename, bytes: file.size },
     procesadoPor: actor(req),
   });
-  audit(report, req, nextVersion === 1 ? "BORRADOR CARGADO" : "BORRADOR REEMPLAZADO", file.originalname);
+  const auditAction = nextVersion === 1
+    ? "BORRADOR CARGADO"
+    : ["LIBERADO", "DISPONIBLE"].includes(previousState)
+      ? "LIBERADO REEMPLAZADO COMO BORRADOR"
+      : "BORRADOR REEMPLAZADO";
+  audit(report, req, auditAction, file.originalname);
   await report.save();
 
   return { conflict: false, data: report };
