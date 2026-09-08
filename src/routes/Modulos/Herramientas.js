@@ -15,6 +15,8 @@ const PatchUser = require("../../controllers/Herramientas/User/pacthUser");
 const requireAuth = require("../../controllers/auth/requireAuth");
 const getNotifications = require("../../controllers/Herramientas/Notifications/getNotifications");
 const markNotificationRead = require("../../controllers/Herramientas/Notifications/markNotificationRead");
+const hideNotification = require("../../controllers/Herramientas/Notifications/hideNotification");
+const restoreNotification = require("../../controllers/Herramientas/Notifications/restoreNotification");
 
 const herramientasRouter = Router();
 
@@ -23,6 +25,8 @@ herramientasRouter.get("/getUsuariosPaginacion", getUsuariosPaginacion);
 herramientasRouter.get("/getCatalogoAccesos", getCatalogoAccesos);
 herramientasRouter.get("/notificaciones", requireAuth, getNotifications);
 herramientasRouter.patch("/notificaciones/:id/leida", requireAuth, markNotificationRead);
+herramientasRouter.delete("/notificaciones/:id", requireAuth, hideNotification);
+herramientasRouter.patch("/notificaciones/:id/restaurar", requireAuth, restoreNotification);
 herramientasRouter.post("/postModule", createModule);
 herramientasRouter.post("/postSubModule", createSubmodule);
 herramientasRouter.post("/postPermission", postPermissions);

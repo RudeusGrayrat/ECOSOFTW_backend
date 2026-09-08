@@ -11,6 +11,7 @@ const getNotifications = async (req, res) => {
       .map((name) => name.toUpperCase());
 
     const visibleFilter = {
+      "hiddenBy.userId": { $ne: user._id },
       $or: [
         { type: "GLOBAL" },
         { type: "SUBMODULE", submodule: { $in: submodules } },

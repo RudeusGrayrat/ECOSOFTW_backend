@@ -24,6 +24,12 @@ const notificationSchema = new mongoose.Schema(
         readAt: { type: Date, default: Date.now },
       },
     ],
+    hiddenBy: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "UserEcosoft" },
+        hiddenAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
