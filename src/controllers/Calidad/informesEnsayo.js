@@ -351,22 +351,19 @@ async function isSealAreaAvailable(pdfBuffer, page, pageNumber) {
   }
 }
 
-async function selectSealPage(pdf) {
+async function selectSealPageIndex(pdf, inspectionBuffer) {
   const pages = pdf.getPages();
   if (!pages.length) throw new Error("El PDF no tiene páginas para procesar");
-  const inspectionBuffer = Buffer.from(await pdf.save());
   const firstAvailable = await isSealAreaAvailable(inspectionBuffer, pages[0], 1);
-  if (firstAvailable !== false) return pages[0];
+  if (firstAvailable !== false) return 0;
 
   const lastIndex = pages.length - 1;
   if (lastIndex > 0) {
     const lastAvailable = await isSealAreaAvailable(inspectionBuffer, pages[lastIndex], lastIndex + 1);
-    if (lastAvailable !== false) return pages[lastIndex];
+    if (lastAvailable !== false) return lastIndex;
   }
 
-  const { width, height } = pages[0].getSize();
-  const validationPage = pdf.addPage([width, height]);
-  return validationPage;
+  return pages.length;
 }
 
 function drawValidationHeader(page, report, font) {
@@ -416,10 +413,24 @@ async function processPdf(source, report, options = {}) {
     pdf = watermarkedPdf;
   }
 
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const sealPage = includeAccessSeal || includeFirma ? await selectSealPage(pdf) : null;
-  const sealPageIsAppended = sealPage && pdf.getPages().indexOf(sealPage) === pdf.getPageCount() - 1 && pdf.getPageCount() > originalPdf.getPageCount();
-  if (sealPageIsAppended) drawValidationHeader(sealPage, report, font);
+  let sealPage = null;
+  let font = null;
+
+  if (includeAccessSeal || includeFirma) {
+    const inspectionBuffer = Buffer.from(await pdf.save());
+    pdf = await PDFDocument.load(inspectionBuffer);
+    const sealPageIndex = await selectSealPageIndex(pdf, inspectionBuffer);
+    const pages = pdf.getPages();
+    font = await pdf.embedFont(StandardFonts.Helvetica);
+
+    if (sealPageIndex >= pages.length) {
+      const { width, height } = pages[0].getSize();
+      sealPage = pdf.addPage([width, height]);
+      drawValidationHeader(sealPage, report, font);
+    } else {
+      sealPage = pages[sealPageIndex];
+    }
+  }
 
   if (includeAccessSeal) {
     const qr = await QRCode.toDataURL(portalUrl(), { margin: 1, width: 280 });
