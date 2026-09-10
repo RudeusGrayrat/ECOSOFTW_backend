@@ -11,8 +11,10 @@ router.post("/informes-ensayo/bulk/descargar", requireAuth, requirePermission("C
 router.post("/informes-ensayo/bulk/aprobar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobarMasivo);
 router.post("/informes-ensayo/bulk/liberar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ENVIAR"), informes.liberarMasivo);
 router.get("/informes-ensayo/configuracion", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "VER"), informes.configuracion);
+router.get("/informes-ensayo/configuracion/firma/archivo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "VER"), informes.archivoFirmaConfiguracion);
 router.post("/informes-ensayo/configuracion/firma", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.uploadAsset, informes.actualizarFirma);
 router.delete("/informes-ensayo/configuracion/firma", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.eliminarFirma);
+router.get("/informes-ensayo/configuracion/marca-agua/:tipo/archivo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "VER"), informes.archivoMarcaAguaConfiguracion);
 router.post("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.uploadAsset, informes.actualizarMarcaAgua);
 router.delete("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.eliminarMarcaAgua);
 router.post("/informes-ensayo/procesar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "CREAR"), informes.upload, informes.procesar);

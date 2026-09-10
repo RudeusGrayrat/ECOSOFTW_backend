@@ -569,6 +569,34 @@ exports.configuracion = async (req, res) => {
   }
 };
 
+function sendConfigAsset(res, asset) {
+  if (!asset?.path) return res.status(404).json({ message: "No hay archivo configurado" });
+  const filePath = assertInsideStorage(asset.path);
+  res.setHeader("Content-Type", asset.mimetype || "application/octet-stream");
+  res.setHeader("Content-Disposition", `attachment; filename="${asset.filename || path.basename(filePath)}"`);
+  return res.sendFile(filePath);
+}
+
+exports.archivoFirmaConfiguracion = async (_req, res) => {
+  try {
+    const config = await getConfig();
+    return sendConfigAsset(res, config.firma);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.archivoMarcaAguaConfiguracion = async (req, res) => {
+  try {
+    const tipo = normalize(req.params.tipo);
+    if (!tiposMarcaAgua.includes(tipo)) return res.status(400).json({ message: "Tipo de marca de agua no válido" });
+    const config = await getConfig();
+    return sendConfigAsset(res, config.marcasAgua?.[tipo]);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 exports.actualizarFirma = async (req, res) => {
   try {
     if (!req.file || !["image/png", "image/jpeg"].includes(req.file.mimetype)) {
