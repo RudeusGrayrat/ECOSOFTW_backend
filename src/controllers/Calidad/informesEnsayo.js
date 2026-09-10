@@ -312,7 +312,6 @@ async function renderPdfPageToPpm(pdfBuffer, pageNumber) {
       "-r",
       String(selloOccupancy.dpi),
       "-singlefile",
-      "-ppm",
       input,
       outputPrefix,
     ]);

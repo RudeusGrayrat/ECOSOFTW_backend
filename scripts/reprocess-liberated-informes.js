@@ -1,5 +1,6 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
+const fs = require("fs/promises");
 const Informe = require("../src/Models/Calidad/InformeEnsayo");
 const informesController = require("../src/controllers/Calidad/informesEnsayo");
 
@@ -36,14 +37,21 @@ const main = async () => {
         omitted.push(`${report.codigo}: sin archivo original`);
         continue;
       }
+      const beforeBytes = version.publicado?.path
+        ? await fs.stat(version.publicado.path).then((stat) => stat.size).catch(() => 0)
+        : 0;
 
       if (!write) {
-        console.log(`[dry-run] ${report.codigo}: se regeneraría ${version.publicado?.filename || "sin publicado"}`);
+        console.log(`[dry-run] ${report.codigo}: se regeneraría ${version.publicado?.filename || "sin publicado"} (${beforeBytes} bytes actuales)`);
         continue;
       }
 
       await informesController.__regenerarOficial(report, fakeReq, "Reprocesado oficial por mantenimiento");
-      console.log(`${report.codigo}: oficial regenerado`);
+      const updatedVersion = report.versiones.find((item) => item.numero === report.versionActual);
+      const afterBytes = updatedVersion?.publicado?.path
+        ? await fs.stat(updatedVersion.publicado.path).then((stat) => stat.size).catch(() => updatedVersion.publicado?.bytes || 0)
+        : 0;
+      console.log(`${report.codigo}: oficial regenerado (${beforeBytes} -> ${afterBytes} bytes)`);
       processed += 1;
     } catch (error) {
       omitted.push(`${report.codigo}: ${error.message}`);
