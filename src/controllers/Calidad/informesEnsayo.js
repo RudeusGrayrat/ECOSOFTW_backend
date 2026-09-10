@@ -180,16 +180,28 @@ const cleanOriginalVisibleName = (filename = "") => {
 
 const visibleProcessedName = (report, version) => {
   const tipo = normalize(version?.tipo || report.tipoVersion);
-  if (tipo === "OFICIAL" || report.estado === "LIBERADO" || report.estado === "DISPONIBLE") return `IE_${safeSegment(report.codigo)}.pdf`;
-  if (tipo === "PRELIMINAR" || report.estado === "PRELIMINAR") return `PRELIMINAR_${safeSegment(report.codigo)}.pdf`;
+  if (tipo === "OFICIAL") return `IE_${safeSegment(report.codigo)}.pdf`;
+  if (tipo === "PRELIMINAR") return `PRELIMINAR_${safeSegment(report.codigo)}.pdf`;
+  if (!version?.tipo && (report.estado === "LIBERADO" || report.estado === "DISPONIBLE")) return `IE_${safeSegment(report.codigo)}.pdf`;
+  if (!version?.tipo && report.estado === "PRELIMINAR") return `PRELIMINAR_${safeSegment(report.codigo)}.pdf`;
   return "";
 };
 
 const normalizeVersionType = (report, version) => {
-  if (version?.tipo && version.tipo !== "BORRADOR") return version.tipo;
+  if (version?.tipo) return version.tipo;
   if (report.tipoVersion === "OFICIAL" || report.estado === "LIBERADO" || report.estado === "DISPONIBLE") return "OFICIAL";
   if (report.tipoVersion === "PRELIMINAR" || report.estado === "PRELIMINAR") return "PRELIMINAR";
   return "BORRADOR";
+};
+
+const officialFilenameFor = (codigo) => `IE_${safeSegment(codigo)}.pdf`;
+
+const requiresOfficialReprocess = (report, version) => {
+  const estado = normalize(report?.estado);
+  if (!["LIBERADO", "DISPONIBLE"].includes(estado)) return false;
+  if (!version?.publicado?.path) return true;
+  if (normalize(version?.tipo) !== "OFICIAL") return true;
+  return version?.publicado?.filename !== officialFilenameFor(report.codigo);
 };
 
 async function saveFile(codigo, version, filename, buffer) {
@@ -756,12 +768,13 @@ exports.listar = async (req, res) => {
             cliente: item.cliente || parsed.cliente,
             matriz: item.matriz || parsed.matriz,
             acreditacion: item.acreditacion || item.plantilla?.tipo || "SIN_ACREDITACION",
-            tipoVersion: item.tipoVersion || versionActual?.tipo || (estadoNormalizado === "LIBERADO" ? "OFICIAL" : estadoNormalizado),
+            tipoVersion: versionActual?.tipo || item.tipoVersion || (estadoNormalizado === "LIBERADO" ? "OFICIAL" : estadoNormalizado),
             vistoBuenoJefatura: Boolean(item.vistoBuenoJefatura || estadoNormalizado === "LIBERADO" || estadoNormalizado === "PRELIMINAR"),
             estado: estadoNormalizado,
             archivoOriginal: cleanOriginalVisibleName(originalFilename),
             archivoGenerado: visibleProcessedName({ ...item, estado: estadoNormalizado }, versionActual) || versionActual?.publicado?.filename || "",
             versionesVisibles,
+            requiereReprocesarOficial: requiresOfficialReprocess({ ...item, estado: estadoNormalizado }, versionActual),
             observacionesCount: (item.observaciones || []).filter((observacion) => Number(observacion.version) === Number(item.versionActual)).length,
             urlConsulta: portalUrl(),
           };
@@ -906,6 +919,15 @@ async function regenerarVersion(report, req, tipoVersion, tipoMarcaAgua, include
   report.markModified("versiones");
 }
 
+async function regenerarOficial(report, req, detalleAuditoria = "Informe oficial liberado para consulta publica") {
+  await regenerarVersion(report, req, "OFICIAL", report.acreditacion || report.plantilla?.tipo || "SIN_ACREDITACION", true, true);
+  report.estado = "LIBERADO";
+  report.tipoVersion = "OFICIAL";
+  report.vistoBuenoJefatura = true;
+  audit(report, req, "LIBERADO", detalleAuditoria);
+  await report.save();
+}
+
 exports.aprobar = async (req, res) => {
   try {
     const report = await Informe.findById(req.params.id);
@@ -1005,11 +1027,7 @@ exports.liberar = async (req, res) => {
     if (!report) return res.status(404).json({ message: "Informe no encontrado" });
     if (report.papelera) return res.status(400).json({ message: "Restablece el informe antes de liberarlo" });
     if (!report.vistoBuenoJefatura && report.estado !== "PRELIMINAR") return res.status(400).json({ message: "El informe necesita visto bueno de jefatura antes de liberarse" });
-    await regenerarVersion(report, req, "OFICIAL", report.acreditacion || report.plantilla?.tipo || "SIN_ACREDITACION", true, true);
-    report.estado = "LIBERADO";
-    report.tipoVersion = "OFICIAL";
-    audit(report, req, "LIBERADO", "Informe oficial liberado para consulta publica");
-    await report.save();
+    await regenerarOficial(report, req);
     let correoEnviado = false;
     let correoError = "";
     if (req.body?.enviarCorreo) {
@@ -1103,13 +1121,10 @@ exports.liberarMasivo = async (req, res) => {
     }
     for (const report of reports) {
       try {
-        if (report.estado === "LIBERADO" || report.estado === "DISPONIBLE") throw new Error("ya está liberado");
+        const versionActual = report.versiones.find((item) => item.numero === report.versionActual);
+        if ((report.estado === "LIBERADO" || report.estado === "DISPONIBLE") && !requiresOfficialReprocess(report, versionActual)) throw new Error("ya está liberado");
         if (!report.vistoBuenoJefatura && report.estado !== "PRELIMINAR") throw new Error("necesita visto bueno de jefatura");
-        await regenerarVersion(report, req, "OFICIAL", report.acreditacion || report.plantilla?.tipo || "SIN_ACREDITACION", true, true);
-        report.estado = "LIBERADO";
-        report.tipoVersion = "OFICIAL";
-        audit(report, req, "LIBERADO", "Liberación masiva como informe oficial");
-        await report.save();
+        await regenerarOficial(report, req, "Liberación masiva como informe oficial");
         resultado.procesados += 1;
 
         if (req.body?.enviarCorreo) {
@@ -1359,3 +1374,5 @@ exports.archivoPublico = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.__regenerarOficial = regenerarOficial;
