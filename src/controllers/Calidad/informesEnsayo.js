@@ -177,6 +177,7 @@ async function accessIdForPlan(planMonitoreo) {
   if (!planMonitoreo) return uniqueAccessId();
   const existing = await Informe.findOne({
     planMonitoreo,
+    papelera: { $ne: true },
     idAcceso: { $exists: true, $ne: "" },
   }).select("idAcceso claveAccesoHash").lean();
   return existing?.idAcceso || uniqueAccessId();
