@@ -13,6 +13,7 @@ const QRCode = require("qrcode");
 const { PDFDocument, rgb, StandardFonts } = require("pdf-lib");
 const Informe = require("../../Models/Calidad/InformeEnsayo");
 const InformeConfig = require("../../Models/Calidad/InformeEnsayoConfig");
+const Notification = require("../../Models/Herramientas/Notification");
 const escapeRegExp = require("../../utils/escapeRegex");
 
 const execFileAsync = promisify(execFile);
@@ -254,6 +255,12 @@ async function saveConfigFile(filename, buffer) {
 async function removeStoredFile(filePath) {
   if (!filePath) return;
   await fs.rm(assertInsideStorage(filePath), { force: true });
+}
+
+async function removeReportDirectory(codigo) {
+  if (!codigo) return;
+  const directory = path.join(storageRoot, safeSegment(codigo));
+  await fs.rm(assertInsideStorage(directory), { recursive: true, force: true });
 }
 
 async function getConfig() {
@@ -1346,6 +1353,24 @@ exports.restablecer = async (req, res) => {
     audit(report, req, "RESTABLECIDO", "Informe restaurado desde papelera");
     await report.save();
     res.json({ message: "Informe restablecido correctamente", type: "Correcto", data: report });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.eliminarDefinitivo = async (req, res) => {
+  try {
+    const report = await Informe.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: "Informe no encontrado" });
+    if (!report.papelera) return res.status(400).json({ message: "Solo se puede eliminar definitivamente desde la papelera" });
+
+    const reportId = report._id.toString();
+    const codigo = report.codigo;
+    await removeReportDirectory(codigo);
+    await Notification.deleteMany({ "targetEntity.entityId": reportId });
+    await Informe.deleteOne({ _id: report._id });
+
+    res.json({ message: `Informe ${codigo} eliminado definitivamente`, type: "Correcto" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

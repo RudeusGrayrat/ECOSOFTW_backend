@@ -26,6 +26,7 @@ router.post("/informes-ensayo/:id/aprobar", requireAuth, requirePermission("CALI
 router.post("/informes-ensayo/:id/liberar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ENVIAR"), informes.liberar);
 router.post("/informes-ensayo/:id/papelera", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.enviarPapelera);
 router.post("/informes-ensayo/:id/restablecer", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.restablecer);
+router.delete("/informes-ensayo/:id/definitivo", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.eliminarDefinitivo);
 router.post("/informes-ensayo/:id/publicar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobar);
 router.post("/informes-ensayo/:id/anular", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "DESAPROBAR"), informes.enviarPapelera);
 router.post("/publico/informes-ensayo", informes.consultar);
