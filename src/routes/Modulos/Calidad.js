@@ -10,6 +10,7 @@ router.post("/informes-ensayo/reportes/oficiales", requireAuth, requirePermissio
 router.post("/informes-ensayo/bulk/descargar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "REPORTAR"), informes.descargarSeleccionados);
 router.post("/informes-ensayo/bulk/aprobar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobarMasivo);
 router.post("/informes-ensayo/bulk/liberar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ENVIAR"), informes.liberarMasivo);
+router.post("/informes-ensayo/bulk/definitivo", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.eliminarDefinitivoMasivo);
 router.get("/informes-ensayo/configuracion", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "VER"), informes.configuracion);
 router.get("/informes-ensayo/configuracion/firma/archivo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "VER"), informes.archivoFirmaConfiguracion);
 router.post("/informes-ensayo/configuracion/firma", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.uploadAsset, informes.actualizarFirma);

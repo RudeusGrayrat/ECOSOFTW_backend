@@ -264,6 +264,15 @@ async function removeReportDirectory(codigo) {
   await fs.rm(assertInsideStorage(directory), { recursive: true, force: true });
 }
 
+async function deleteReportPermanently(report) {
+  const reportId = report._id.toString();
+  const codigo = report.codigo;
+  await removeReportDirectory(codigo);
+  await Notification.deleteMany({ "targetEntity.entityId": reportId });
+  await Informe.deleteOne({ _id: report._id });
+  return codigo;
+}
+
 async function getConfig() {
   return InformeConfig.findOneAndUpdate(
     { key: "default" },
@@ -1365,13 +1374,49 @@ exports.eliminarDefinitivo = async (req, res) => {
     if (!report) return res.status(404).json({ message: "Informe no encontrado" });
     if (!report.papelera) return res.status(400).json({ message: "Solo se puede eliminar definitivamente desde la papelera" });
 
-    const reportId = report._id.toString();
-    const codigo = report.codigo;
-    await removeReportDirectory(codigo);
-    await Notification.deleteMany({ "targetEntity.entityId": reportId });
-    await Informe.deleteOne({ _id: report._id });
+    const codigo = await deleteReportPermanently(report);
 
     res.json({ message: `Informe ${codigo} eliminado definitivamente`, type: "Correcto" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.eliminarDefinitivoMasivo = async (req, res) => {
+  try {
+    const { validIds, invalidIds } = sanitizeObjectIds(req.body?.ids);
+    if (!validIds.length) return res.status(400).json({ message: "Selecciona al menos un informe valido" });
+
+    const reports = await Informe.find({ _id: { $in: validIds }, papelera: true });
+    const resultado = {
+      eliminados: [],
+      omitidos: [...invalidIds.map((id) => `${id}: id invalido`)],
+    };
+
+    if (reports.length !== validIds.length) {
+      resultado.omitidos.push(`${validIds.length - reports.length} informes no encontrados o fuera de papelera`);
+    }
+
+    for (const report of reports) {
+      try {
+        const codigo = await deleteReportPermanently(report);
+        resultado.eliminados.push(codigo);
+      } catch (error) {
+        resultado.omitidos.push(`${report.codigo}: ${error.message}`);
+      }
+    }
+
+    if (!resultado.eliminados.length) {
+      return res.status(400).json({ message: resultado.omitidos.join(". ") || "No se elimino ningun informe" });
+    }
+
+    res.json({
+      message: resultado.omitidos.length
+        ? `${resultado.eliminados.length} informes eliminados definitivamente. ${resultado.omitidos.length} omitidos.`
+        : `${resultado.eliminados.length} informes eliminados definitivamente`,
+      type: resultado.omitidos.length ? "Advertencia" : "Correcto",
+      data: resultado,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
