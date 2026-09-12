@@ -17,18 +17,49 @@ const escapeRegExp = require("../../utils/escapeRegex");
 
 const execFileAsync = promisify(execFile);
 const storageRoot = path.resolve(process.env.INFORMES_STORAGE_PATH || path.join(process.cwd(), "storage", "informes-ensayo"));
+const uploadFileSizeMb = Number(process.env.INFORMES_UPLOAD_FILE_SIZE_MB || 100);
+const uploadBatchSizeMb = Number(process.env.INFORMES_UPLOAD_BATCH_SIZE_MB || 100);
+const uploadMaxCount = Number(process.env.INFORMES_UPLOAD_MAX_COUNT || 50);
+const logProcesar = (message, data = {}) => {
+  console.log(`[informes-ensayo:procesar] ${message}`, JSON.stringify(data));
+};
+const isPdfUpload = (file) => file.mimetype === "application/pdf" || file.originalname?.toLowerCase().endsWith(".pdf");
+const isConfigAssetUpload = (file) => isPdfUpload(file) || ["image/png", "image/jpeg"].includes(file.mimetype);
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
-  fileFilter: (_, file, cb) => cb(null, file.mimetype === "application/pdf"),
+  limits: { fileSize: uploadFileSizeMb * 1024 * 1024, files: uploadMaxCount },
+  fileFilter: (_, file, cb) => isPdfUpload(file)
+    ? cb(null, true)
+    : cb(new Error(`El archivo ${file.originalname || ""} no es un PDF válido`)),
 });
 const uploadAsset = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (_, file, cb) => cb(null, ["application/pdf", "image/png", "image/jpeg"].includes(file.mimetype)),
+  fileFilter: (_, file, cb) => isConfigAssetUpload(file)
+    ? cb(null, true)
+    : cb(new Error(`El archivo ${file.originalname || ""} no es PNG, JPG o PDF válido`)),
 });
 
-exports.upload = upload.fields([{ name: "archivos", maxCount: 50 }, { name: "archivo", maxCount: 1 }]);
+exports.upload = (req, res, next) => {
+  upload.fields([{ name: "archivos", maxCount: uploadMaxCount }, { name: "archivo", maxCount: 1 }])(req, res, (error) => {
+    if (!error) return next();
+    logProcesar("multer-error", {
+      code: error.code,
+      message: error.message,
+      limitFileSizeMb: uploadFileSizeMb,
+      limitMaxCount: uploadMaxCount,
+    });
+    if (error instanceof multer.MulterError) {
+      const messages = {
+        LIMIT_FILE_SIZE: `Uno de los PDF supera ${uploadFileSizeMb} MB.`,
+        LIMIT_FILE_COUNT: `Solo puedes subir hasta ${uploadMaxCount} PDF por carga.`,
+        LIMIT_UNEXPECTED_FILE: "El campo de archivos no coincide con el formulario esperado.",
+      };
+      return res.status(413).json({ message: messages[error.code] || error.message, type: "Error" });
+    }
+    return res.status(400).json({ message: error.message, type: "Error" });
+  });
+};
 exports.uploadAsset = uploadAsset.single("archivo");
 
 const actor = (req) => req.user?._id;
@@ -901,28 +932,106 @@ exports.procesar = async (req, res) => {
       ...(req.files?.archivos || []),
       ...(req.files?.archivo || []),
     ];
-    if (!files.length) return res.status(400).json({ message: "Debes enviar uno o varios PDF de hasta 50 MB" });
+    logProcesar("request-recibido", {
+      totalFiles: files.length,
+      reemplazar: req.body?.reemplazar,
+      tipoPlantilla: req.body?.tipoPlantilla,
+      metadataLength: req.body?.metadata?.length || 0,
+      files: files.map((file) => ({
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+      })),
+    });
+    if (!files.length) return res.status(400).json({ message: `Debes enviar uno o varios PDF de hasta ${uploadFileSizeMb} MB` });
+    const totalBytes = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+    if (totalBytes > uploadBatchSizeMb * 1024 * 1024) {
+      logProcesar("lote-rechazado-por-tamano", {
+        totalMb: Number((totalBytes / 1024 / 1024).toFixed(2)),
+        limitBatchSizeMb: uploadBatchSizeMb,
+      });
+      return res.status(413).json({
+        message: `La carga completa pesa ${(totalBytes / 1024 / 1024).toFixed(1)} MB. El máximo permitido por lote es ${uploadBatchSizeMb} MB.`,
+        type: "Error",
+      });
+    }
     let metadataRows = [];
     try {
       metadataRows = req.body?.metadata ? JSON.parse(req.body.metadata) : [];
     } catch (_) {
+      logProcesar("metadata-json-invalido", { metadataPreview: req.body?.metadata?.slice?.(0, 180) });
       return res.status(400).json({ message: "La previsualización de archivos llegó con un formato inválido" });
+    }
+
+    const fileItems = files.map((file, index) => ({
+      file,
+      metadata: metadataRows.find((item) => item.filename === file.originalname) || metadataRows[index] || {},
+    }));
+
+    if (req.body?.reemplazar !== "true") {
+      const existingConflicts = [];
+      for (const { file, metadata } of fileItems) {
+        const parsed = parseInformeFilename(file.originalname);
+        const codigo = normalize(metadata.codigo || req.body?.codigo || parsed.codigo || detectCode(file.originalname));
+        logProcesar("archivo-analizado", {
+          archivo: file.originalname,
+          codigo,
+          parsed,
+          metadata,
+        });
+        if (!codigo) continue;
+        const existing = await Informe.findOne({ codigo }).select("_id codigo estado versionActual").lean();
+        if (existing) {
+          existingConflicts.push({
+            _id: existing._id,
+            codigo: existing.codigo,
+            estado: existing.estado,
+            versionActual: existing.versionActual,
+            archivo: file.originalname,
+          });
+        }
+      }
+
+      if (existingConflicts.length) {
+        logProcesar("conflictos-existentes", {
+          total: existingConflicts.length,
+          conflicts: existingConflicts.map((item) => ({
+            codigo: item.codigo,
+            estado: item.estado,
+            versionActual: item.versionActual,
+            archivo: item.archivo,
+          })),
+        });
+        return res.status(409).json({
+          message: existingConflicts.length === 1
+            ? `El informe ${existingConflicts[0].codigo} ya existe. ¿Deseas reemplazarlo?`
+            : `${existingConflicts.length} informes ya existen. ¿Deseas reemplazarlos todos?`,
+          exists: true,
+          data: existingConflicts.length === 1 ? existingConflicts[0] : existingConflicts,
+          conflicts: existingConflicts,
+        });
+      }
     }
 
     const resultados = [];
     const conflictos = [];
-    for (const [index, file] of files.entries()) {
+    for (const { file, metadata } of fileItems) {
       try {
-        const metadata = metadataRows.find((item) => item.filename === file.originalname) || metadataRows[index] || {};
         const result = await guardarBorrador(req, file, req.body, metadata);
         if (result.conflict) conflictos.push(result.data);
         else resultados.push(result.data);
       } catch (error) {
+        logProcesar("archivo-error", {
+          archivo: file.originalname,
+          message: error.message,
+          metadata,
+        });
         conflictos.push({ archivo: file.originalname, message: error.message });
       }
     }
 
     if (!resultados.length && conflictos.length === 1 && conflictos[0]?._id) {
+      logProcesar("conflicto-unico-post-guardar", conflictos[0]);
       return res.status(409).json({
         message: "El informe ya existe. ¿Desea reemplazarlo?",
         exists: true,
@@ -930,8 +1039,20 @@ exports.procesar = async (req, res) => {
       });
     }
 
+    const failedMessage = conflictos.length === 1
+      ? conflictos[0].message || `No se pudo cargar ${conflictos[0].archivo || "el archivo"}`
+      : `No se cargaron ${conflictos.length} archivos. Revisa los detalles de la carga.`;
+    logProcesar("respuesta-final", {
+      status: resultados.length ? 201 : 400,
+      cargados: resultados.length,
+      conflictos: conflictos.length,
+      failedMessage,
+    });
+
     res.status(resultados.length ? 201 : 400).json({
-      message: resultados.length === 1 ? "Borrador cargado correctamente" : `${resultados.length} borradores cargados correctamente`,
+      message: resultados.length
+        ? resultados.length === 1 ? "Borrador cargado correctamente" : `${resultados.length} borradores cargados correctamente`
+        : failedMessage,
       type: resultados.length ? "Correcto" : "Error",
       data: resultados,
       conflicts: conflictos,
