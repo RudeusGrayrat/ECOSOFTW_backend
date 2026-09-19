@@ -1,4 +1,5 @@
 const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
+const UserEcosoft = require("../../../Models/Herramientas/User");
 
 const patchCotizacion = async (req, res) => {
     const { id: _id } = req.params;
@@ -39,8 +40,13 @@ const patchCotizacion = async (req, res) => {
         if (estado) findCotizacion.estado = estado;
         if (facturacion) findCotizacion.facturacion = facturacion;
         if (actualizadoPor) findCotizacion.actualizadoPor = actualizadoPor;
-        if (aprobadoPor) findCotizacion.aprobadoPor = aprobadoPor;
-        if (firmaAprobador) findCotizacion.firmaAprobador = firmaAprobador;
+        if (aprobadoPor) {
+            findCotizacion.aprobadoPor = aprobadoPor;
+            // La firma queda como una referencia al archivo guardado del usuario,
+            // no a una URL que el navegador pueda cambiar o dejar inválida.
+            const approver = await UserEcosoft.findById(aprobadoPor).select("firma firmaArchivo");
+            findCotizacion.firmaAprobador = approver?.firmaArchivo?.path || approver?.firma || firmaAprobador || "";
+        } else if (firmaAprobador) findCotizacion.firmaAprobador = firmaAprobador;
 
         const updatedCotizacion = await findCotizacion.save();
 

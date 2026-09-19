@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const assetSchema = new mongoose.Schema({ path: String, filename: String, mimetype: String, bytes: Number, updatedAt: Date }, { _id: false });
 
 const userEcosoftSchema = mongoose.Schema(
   {
@@ -27,6 +28,8 @@ const userEcosoftSchema = mongoose.Schema(
       type: String,
     },
     firma: { type: String },
+    photoArchivo: assetSchema,
+    firmaArchivo: assetSchema,
     estado: {
       type: String,
       default: "ACTIVO",

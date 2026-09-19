@@ -3,7 +3,8 @@ const { hashPassword } = require("../../auth/bcrypt");
 
 const PatchUser = async (req, res) => {
     const { id } = req.params;
-    const { userName, password, photo, firma, modules, correoElectronico, colaborador, telefono, puesto, estado } = req.body;
+    const { userName, password, photo, firma, correoElectronico, colaborador, telefono, puesto, estado } = req.body;
+    const modules = typeof req.body.modules === "string" ? JSON.parse(req.body.modules) : req.body.modules;
 
     try {
         if (!id) {

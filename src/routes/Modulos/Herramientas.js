@@ -12,22 +12,26 @@ const getUsuariosPaginacion = require("../../controllers/Herramientas/User/getUs
 const getCatalogoAccesos = require("../../controllers/Herramientas/User/getCatalogoAccesos");
 const EliminarDocumento = require("../../controllers/Comercial/Cotizaciones/eliminarDocumento");
 const PatchUser = require("../../controllers/Herramientas/User/pacthUser");
+const userAssets = require("../../controllers/Herramientas/User/userAssets");
 const requireAuth = require("../../controllers/auth/requireAuth");
 const getNotifications = require("../../controllers/Herramientas/Notifications/getNotifications");
 const markNotificationRead = require("../../controllers/Herramientas/Notifications/markNotificationRead");
 const hideNotification = require("../../controllers/Herramientas/Notifications/hideNotification");
+const hideNotifications = require("../../controllers/Herramientas/Notifications/hideNotifications");
 const restoreNotification = require("../../controllers/Herramientas/Notifications/restoreNotification");
 const plantillas = require("../../controllers/Herramientas/Plantillas/plantillasDocumentales");
 const requirePermission = require("../../controllers/auth/requirePermission");
 
 const herramientasRouter = Router();
 
-herramientasRouter.post("/postUsuariosEcosoft", postUsuariosEcosoft);
+herramientasRouter.get("/public/usuarios/:id/:type", userAssets.publicAsset);
+herramientasRouter.post("/postUsuariosEcosoft", userAssets.uploadAssets, postUsuariosEcosoft);
 herramientasRouter.get("/getUsuariosPaginacion", getUsuariosPaginacion);
 herramientasRouter.get("/getCatalogoAccesos", getCatalogoAccesos);
 herramientasRouter.get("/notificaciones", requireAuth, getNotifications);
 herramientasRouter.patch("/notificaciones/:id/leida", requireAuth, markNotificationRead);
 herramientasRouter.delete("/notificaciones/:id", requireAuth, hideNotification);
+herramientasRouter.delete("/notificaciones", requireAuth, hideNotifications);
 herramientasRouter.patch("/notificaciones/:id/restaurar", requireAuth, restoreNotification);
 herramientasRouter.post("/postModule", createModule);
 herramientasRouter.post("/postSubModule", createSubmodule);
@@ -43,7 +47,9 @@ herramientasRouter.post("/plantillas-documentales", requireAuth, requirePermissi
 herramientasRouter.patch("/plantillas-documentales/:id", requireAuth, requirePermission("HERRAMIENTAS", "PLANTILLAS", "EDITAR"), plantillas.upload, plantillas.actualizar);
 herramientasRouter.get("/plantillas-documentales/:tipo/archivo", requireAuth, requirePermission("HERRAMIENTAS", "PLANTILLAS", "VER"), plantillas.descargar);
 
-herramientasRouter.patch("/patchUser/:id", PatchUser)
+herramientasRouter.patch("/patchUser/:id", userAssets.uploadAssets, PatchUser)
+herramientasRouter.post("/usuarios/:id/archivo/:type", requireAuth, userAssets.uploadOne, userAssets.replaceAsset);
+herramientasRouter.delete("/usuarios/:id/archivo/:type", requireAuth, userAssets.removeAsset);
 
 herramientasRouter.delete("/deleteDocumentCloudinary", EliminarDocumento);
 

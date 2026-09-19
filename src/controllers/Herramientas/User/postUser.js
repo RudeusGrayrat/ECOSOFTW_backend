@@ -2,7 +2,8 @@ const UserEcosoft = require("../../../Models/Herramientas/User");
 const { hashPassword } = require("../../auth/bcrypt");
 
 const postUsuariosEcosoft = async (req, res) => {
-  const { userName, password, photo, firma, modules, correoElectronico, colaborador, telefono, puesto, estado } = req.body;
+  const { userName, password, photo, firma, correoElectronico, colaborador, telefono, puesto, estado } = req.body;
+  const modules = typeof req.body.modules === "string" ? JSON.parse(req.body.modules) : req.body.modules;
   try {
     if (!userName || !password || !Array.isArray(modules)) {
       return res.status(400).json({ message: "Faltan datos obligatorios" });
@@ -31,6 +32,8 @@ const postUsuariosEcosoft = async (req, res) => {
       puesto,
       estado: estado || "ACTIVO"
     });
+    const { attachIncomingAssets } = require("./userAssets");
+    await attachIncomingAssets(newUser, req.files);
     await newUser.save();
     res
       .status(201)
