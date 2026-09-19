@@ -4,6 +4,7 @@ const patchCotizacion = async (req, res) => {
     const { id: _id } = req.params;
     const {
         proyecto_id,
+        solicitud_id,
         tipoDeServicio,
         tiempoDeEntrega,
         analisis,
@@ -14,7 +15,10 @@ const patchCotizacion = async (req, res) => {
         totalConIgv,
         igv,
         estado,
+        facturacion,
         actualizadoPor,
+        aprobadoPor,
+        firmaAprobador,
     } = req.body;
     try {
         const findCotizacion = await Comercial_Cotizaciones.findById(_id);
@@ -22,6 +26,7 @@ const patchCotizacion = async (req, res) => {
             return res.status(403).json({ message: "Cotización no encontrada" });
         }
         if (proyecto_id) findCotizacion.proyecto_id = proyecto_id;
+        if (solicitud_id) findCotizacion.solicitud_id = solicitud_id;
         if (tipoDeServicio) findCotizacion.tipoDeServicio = tipoDeServicio;
         if (tiempoDeEntrega) findCotizacion.tiempoDeEntrega = tiempoDeEntrega;
         if (analisis) findCotizacion.analisis = analisis;
@@ -32,7 +37,10 @@ const patchCotizacion = async (req, res) => {
         if (totalConIgv) findCotizacion.totalConIgv = totalConIgv;
         if (igv) findCotizacion.igv = igv;
         if (estado) findCotizacion.estado = estado;
+        if (facturacion) findCotizacion.facturacion = facturacion;
         if (actualizadoPor) findCotizacion.actualizadoPor = actualizadoPor;
+        if (aprobadoPor) findCotizacion.aprobadoPor = aprobadoPor;
+        if (firmaAprobador) findCotizacion.firmaAprobador = firmaAprobador;
 
         const updatedCotizacion = await findCotizacion.save();
 

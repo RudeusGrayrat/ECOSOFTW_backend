@@ -1,6 +1,14 @@
 const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
 
-const generarCorrelativa = async (fechaOperacion) => {
+const clienteCodigo = (cliente = "CLIENTE") => cliente
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toUpperCase()
+  .replace(/[^A-Z0-9]+/g, "-")
+  .replace(/(^-|-$)/g, "")
+  .slice(0, 40) || "CLIENTE";
+
+const generarCorrelativa = async (fechaOperacion, cliente) => {
   try {
     const añoActual = fechaOperacion.getFullYear().toString().slice(2); // "25"
     const correlativaBase = `${añoActual}`; // "25"
@@ -42,7 +50,7 @@ const generarCorrelativa = async (fechaOperacion) => {
     // Construir correlativa visible (string final)
     const correlativaVisible = `ECO${añoActual}-${nuevoNumeroSecuencial
       .toString()
-      .padStart(5, "0")}-CT CAC - VER08`;
+      .padStart(4, "0")}-CT-VR00-${clienteCodigo(cliente)}`;
 
     return {
       correlativa, // numérico (para la BD)

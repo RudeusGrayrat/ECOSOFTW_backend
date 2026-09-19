@@ -3,7 +3,7 @@ const { hashPassword } = require("../../auth/bcrypt");
 
 const PatchUser = async (req, res) => {
     const { id } = req.params;
-    const { userName, password, photo, modules, correoElectronico, colaborador, telefono, puesto, estado } = req.body;
+    const { userName, password, photo, firma, modules, correoElectronico, colaborador, telefono, puesto, estado } = req.body;
 
     try {
         if (!id) {
@@ -16,6 +16,7 @@ const PatchUser = async (req, res) => {
         if (userName) findUser.userName = userName;
         if (password) findUser.password = await hashPassword(password);
         if (photo) findUser.photo = photo;
+        if (firma) findUser.firma = firma;
         if (Array.isArray(modules)) findUser.modules = modules;
         if (correoElectronico) findUser.correoElectronico = correoElectronico;
         if (colaborador) findUser.colaborador = colaborador;

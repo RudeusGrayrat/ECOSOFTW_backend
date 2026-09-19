@@ -17,6 +17,8 @@ const getNotifications = require("../../controllers/Herramientas/Notifications/g
 const markNotificationRead = require("../../controllers/Herramientas/Notifications/markNotificationRead");
 const hideNotification = require("../../controllers/Herramientas/Notifications/hideNotification");
 const restoreNotification = require("../../controllers/Herramientas/Notifications/restoreNotification");
+const plantillas = require("../../controllers/Herramientas/Plantillas/plantillasDocumentales");
+const requirePermission = require("../../controllers/auth/requirePermission");
 
 const herramientasRouter = Router();
 
@@ -35,6 +37,11 @@ herramientasRouter.patch("/patchPermission/:id", patchPermission);
 herramientasRouter.get("/getModules", getModules);
 herramientasRouter.get("/getModulosYSubmodulosPaginacion", getModulosYSubmodulosPaginacion);
 herramientasRouter.patch("/patchModuloYSubmodulo/:id", patchModuloYSubmodulo);
+
+herramientasRouter.get("/plantillas-documentales", requireAuth, requirePermission("HERRAMIENTAS", "PLANTILLAS", "VER"), plantillas.listar);
+herramientasRouter.post("/plantillas-documentales", requireAuth, requirePermission("HERRAMIENTAS", "PLANTILLAS", "CREAR"), plantillas.upload, plantillas.guardar);
+herramientasRouter.patch("/plantillas-documentales/:id", requireAuth, requirePermission("HERRAMIENTAS", "PLANTILLAS", "EDITAR"), plantillas.upload, plantillas.actualizar);
+herramientasRouter.get("/plantillas-documentales/:tipo/archivo", requireAuth, requirePermission("HERRAMIENTAS", "PLANTILLAS", "VER"), plantillas.descargar);
 
 herramientasRouter.patch("/patchUser/:id", PatchUser)
 

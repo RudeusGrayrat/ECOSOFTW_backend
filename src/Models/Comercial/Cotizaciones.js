@@ -4,11 +4,13 @@ const comercial_cotizacionesSchema = mongoose.Schema(
   {
     correlativa: { type: Number, required: true },
     correlativaVisible: { type: String, required: true },
+    version: { type: Number, default: 0, required: true },
     proyecto_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "proyectos",
+      ref: "comercial_proyectos",
       required: true,
     },
+    solicitud_id: { type: mongoose.Schema.Types.ObjectId, ref: "comercial_solicitudes_cotizacion" },
     tipoDeServicio: { type: String, required: true },
     tiempoDeEntrega: { type: Array, required: true },
     analisis: [
@@ -19,6 +21,8 @@ const comercial_cotizacionesSchema = mongoose.Schema(
         },
         cantidad: { type: Number },
         subtotal: { type: Number },
+        modalidad: { type: String, enum: ["PROPIO", "TERCERIZADO"], default: "PROPIO" },
+        proveedor: { type: String, trim: true },
       },
     ],
     gastosOperativos: [
@@ -55,6 +59,12 @@ const comercial_cotizacionesSchema = mongoose.Schema(
     totalSinIgv: { type: Number },
     totalConIgv: { type: Number },
     igv: { type: Number },
+    facturacion: {
+      razonSocial: { type: String, trim: true },
+      ruc: { type: String, trim: true },
+      direccion: { type: String, trim: true },
+      formaPago: { type: String, trim: true },
+    },
     estado: {
       type: String,
       enum: ["PENDIENTE", "APROBADO", "ANULADO"],
@@ -69,6 +79,8 @@ const comercial_cotizacionesSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "UserEcosoft",
     },
+    aprobadoPor: { type: mongoose.Schema.Types.ObjectId, ref: "UserEcosoft" },
+    firmaAprobador: { type: String },
   },
   { timestamps: true }
 );

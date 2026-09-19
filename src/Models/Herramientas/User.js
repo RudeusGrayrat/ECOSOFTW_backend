@@ -26,6 +26,7 @@ const userEcosoftSchema = mongoose.Schema(
     photo: {
       type: String,
     },
+    firma: { type: String },
     estado: {
       type: String,
       default: "ACTIVO",
