@@ -1,5 +1,18 @@
 const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
 const UserEcosoft = require("../../../Models/Herramientas/User");
+const Parametro = require("../../../Models/Comercial/Parametros");
+
+const withParameterSnapshots = async (analisis = []) => {
+    const ids = [...new Set(analisis.map((item) => item.parametro_id?._id?.toString() || item.parametro_id?.toString()).filter(Boolean))];
+    const parameters = await Parametro.find({ _id: { $in: ids }, estado: { $ne: "INACTIVO" } }).lean();
+    const parameterMap = new Map(parameters.map((parameter) => [parameter._id.toString(), parameter]));
+    if (parameterMap.size !== ids.length) throw new Error("Uno o más parámetros no existen o están inactivos");
+    return analisis.map((analysis) => {
+        const id = analysis.parametro_id?._id?.toString() || analysis.parametro_id?.toString();
+        const parameter = parameterMap.get(id);
+        return { ...analysis, parametro_id: id, parametroSnapshot: { tipoDeAnalisis: parameter.tipoDeAnalisis, categoria: parameter.categoria, parametro: parameter.parametro, metodo: parameter.metodo, acreditadoPor: parameter.acreditadoPor, tipoDeAcreditacion: parameter.tipoDeAcreditacion, limiteDeCuantificacionDelMetodo: parameter.limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo: parameter.limiteDeDeteccionDelMetodo, unidadDeMedida: parameter.unidadDeMedida, precio: parameter.precio } };
+    });
+};
 
 const patchCotizacion = async (req, res) => {
     const { id: _id } = req.params;
@@ -30,7 +43,7 @@ const patchCotizacion = async (req, res) => {
         if (solicitud_id) findCotizacion.solicitud_id = solicitud_id;
         if (tipoDeServicio) findCotizacion.tipoDeServicio = tipoDeServicio;
         if (tiempoDeEntrega) findCotizacion.tiempoDeEntrega = tiempoDeEntrega;
-        if (analisis) findCotizacion.analisis = analisis;
+        if (analisis) findCotizacion.analisis = await withParameterSnapshots(analisis);
         if (gastosOperativos) findCotizacion.gastosOperativos = gastosOperativos;
         if (gastosAdministrativos) findCotizacion.gastosAdministrativos = gastosAdministrativos;
         if (gastosGenerales) findCotizacion.gastosGenerales = gastosGenerales;

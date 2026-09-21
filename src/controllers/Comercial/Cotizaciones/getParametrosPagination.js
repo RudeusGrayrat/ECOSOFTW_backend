@@ -3,8 +3,9 @@ const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getParametrosPagination = async (req, res) => {
   try {
-    const { limit = 10, page = 0, search = "", tipoDeAnalisis } = req.query;
+    const { limit = 10, page = 0, search = "", tipoDeAnalisis, includeInactive } = req.query;
     const query = {};
+    if (includeInactive !== "true") query.estado = { $ne: "INACTIVO" };
     if (search) {
       const safeSearch = escapeRegExp(search);
       const regex = new RegExp(safeSearch, "i");

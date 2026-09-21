@@ -10,6 +10,7 @@ const patchCliente = require("../../controllers/Comercial/Clientes/patchCliente"
 const patchCotizacion = require("../../controllers/Comercial/Cotizaciones/patchCotizacion");
 const patchProyecto = require("../../controllers/Comercial/Proyectos/patchProyecto");
 const patchParametro = require("../../controllers/Comercial/Parametros/patchParametros");
+const deleteParametro = require("../../controllers/Comercial/Parametros/deleteParametro");
 const patchTipoDeGasto = require("../../controllers/Comercial/TiposDeGastos/patchTipoDeGasto");
 const postProyectos = require("../../controllers/Comercial/Proyectos/postProyecto");
 const postTiposDeGastos = require("../../controllers/Comercial/Cotizaciones/postTipoDeGastos");
@@ -37,6 +38,7 @@ comercialRouter.patch("/patchCliente/:id", patchCliente);
 comercialRouter.patch("/patchCotizacion/:id", patchCotizacion);
 comercialRouter.patch("/patchProyecto/:id", patchProyecto);
 comercialRouter.patch("/patchParametro/:id", patchParametro);
+comercialRouter.delete("/parametros/:id", deleteParametro);
 comercialRouter.patch("/patchTipoDeGasto/:id", patchTipoDeGasto);
 
 comercialRouter.post("/postCliente", postCliente);

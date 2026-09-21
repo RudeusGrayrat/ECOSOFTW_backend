@@ -23,6 +23,20 @@ const comercial_cotizacionesSchema = mongoose.Schema(
         subtotal: { type: Number },
         modalidad: { type: String, enum: ["PROPIO", "TERCERIZADO"], default: "PROPIO" },
         proveedor: { type: String, trim: true },
+        // Copia inmutable de la ficha usada al cotizar. Evita que un cambio o
+        // desactivación posterior del catálogo altere documentos históricos.
+        parametroSnapshot: {
+          tipoDeAnalisis: String,
+          categoria: String,
+          parametro: String,
+          metodo: String,
+          acreditadoPor: String,
+          tipoDeAcreditacion: String,
+          limiteDeCuantificacionDelMetodo: String,
+          limiteDeDeteccionDelMetodo: String,
+          unidadDeMedida: String,
+          precio: Number,
+        },
       },
     ],
     gastosOperativos: [

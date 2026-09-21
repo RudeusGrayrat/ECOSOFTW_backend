@@ -2,7 +2,7 @@ const Comercial_Parametros = require("../../../Models/Comercial/Parametros");
 
 const patchParametro = async (req, res) => {
     const { id } = req.params;
-    const { tipoDeAnalisis, categoria, parametro, metodo, acreditoPor, tipoDeAcreditacion, limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo, unidad, precio } = req.body;
+    const { tipoDeAnalisis, categoria, parametro, metodo, acreditadoPor, tipoDeAcreditacion, limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo, unidadDeMedida, precio, estado } = req.body;
 
     try {
         const updatedParametro = await Comercial_Parametros.findById(id);
@@ -15,12 +15,13 @@ const patchParametro = async (req, res) => {
         if (categoria) updatedParametro.categoria = categoria;
         if (parametro) updatedParametro.parametro = parametro;
         if (metodo) updatedParametro.metodo = metodo;
-        if (acreditoPor) updatedParametro.acreditoPor = acreditoPor;
+        if (acreditadoPor !== undefined) updatedParametro.acreditadoPor = acreditadoPor;
         if (tipoDeAcreditacion) updatedParametro.tipoDeAcreditacion = tipoDeAcreditacion;
         if (limiteDeCuantificacionDelMetodo) updatedParametro.limiteDeCuantificacionDelMetodo = limiteDeCuantificacionDelMetodo;
         if (limiteDeDeteccionDelMetodo) updatedParametro.limiteDeDeteccionDelMetodo = limiteDeDeteccionDelMetodo;
-        if (unidad) updatedParametro.unidad = unidad;
-        if (precio) updatedParametro.precio = precio;
+        if (unidadDeMedida !== undefined) updatedParametro.unidadDeMedida = unidadDeMedida;
+        if (precio !== undefined) updatedParametro.precio = precio;
+        if (estado) updatedParametro.estado = estado;
         await updatedParametro.save();
 
         res.status(200).json({ message: "Parámetro actualizado correctamente", parametro: updatedParametro, type: "Correcto" });

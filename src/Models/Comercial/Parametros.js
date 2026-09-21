@@ -15,6 +15,7 @@ const comercial_ParametrosSchema = mongoose.Schema(
     limiteDeDeteccionDelMetodo: { type: String, default: "-" },
     unidadDeMedida: { type: String },
     precio: { type: Number },
+    estado: { type: String, enum: ["ACTIVO", "INACTIVO"], default: "ACTIVO" },
   },
   { timestamps: true }
 );

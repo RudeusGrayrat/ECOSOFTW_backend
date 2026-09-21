@@ -3,7 +3,7 @@ const Solicitud = require("../../Models/Comercial/SolicitudesCotizacion");
 const Plan = require("../../Models/Operaciones/PlanesTrabajo");
 const Orden = require("../../Models/Operaciones/OrdenesServicio");
 
-const mapItem = (item) => ({ matriz: item.parametro_id?.tipoDeAnalisis || "", parametro: item.parametro_id?.parametro || "", metodologia: item.parametro_id?.metodo || "", cantidad: item.cantidad || 0, acreditacion: item.parametro_id?.acreditadoPor || "", laboratorio: item.proveedor || "" });
+const mapItem = (item) => { const parameter = item.parametroSnapshot || item.parametro_id || {}; return { matriz: parameter.tipoDeAnalisis || "", parametro: parameter.parametro || "", metodologia: parameter.metodo || "", cantidad: item.cantidad || 0, acreditacion: parameter.acreditadoPor || "", laboratorio: item.proveedor || "" }; };
 
 exports.crearPlan = async (req, res) => {
   try {

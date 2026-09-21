@@ -29,11 +29,11 @@ const sendPdf = async (res, data, tipo, name) => {
   const docx = await renderDocx(data, await templateFor(tipo)); const pdf = await convertToPdf(docx);
   res.set({ "Content-Type": "application/pdf", "Content-Disposition": `inline; filename=${name}.pdf`, "Content-Length": pdf.length }); return res.send(pdf);
 };
-const item = (row) => ({ matriz: row.matriz || row.parametro_id?.tipoDeAnalisis || "", parametro: row.parametro || row.parametro_id?.parametro || "", metodologia: row.metodologia || row.parametro_id?.metodo || "", cantidad: row.cantidad || "", acreditacion: row.acreditacion || row.parametro_id?.acreditadoPor || "", laboratorio: row.laboratorio || row.proveedor || "" });
+const item = (row) => { const parameter = row.parametroSnapshot || row.parametro_id || {}; return { matriz: row.matriz || parameter.tipoDeAnalisis || "", parametro: row.parametro || parameter.parametro || "", metodologia: row.metodologia || parameter.metodo || "", cantidad: row.cantidad || "", acreditacion: row.acreditacion || parameter.acreditadoPor || "", laboratorio: row.laboratorio || row.proveedor || "" }; };
 const money = (value) => `S/. ${Number(value || 0).toFixed(2)}`;
 const sum = (rows = []) => rows.reduce((total, row) => total + Number(row.monto ?? row.subtotal ?? 0), 0);
 const analyst = (row) => {
-  const parameter = row.parametro_id || {};
+  const parameter = row.parametroSnapshot || row.parametro_id || {};
   return { categoria: parameter.categoria || "", parametro: parameter.parametro || "", metodologia: parameter.metodo || "", acreditacion: parameter.acreditadoPor || "", unidad_de_medida: parameter.unidadDeMedida || "", ldm: parameter.limiteDeDeteccionDelMetodo || "", lcm: parameter.limiteDeCuantificacionDelMetodo || "", precio_unitario: money(parameter.precio), cantidad: row.cantidad || "", subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) };
 };
 const gasto = (row, operational = false) => ({ descripcion: row.tipoDeGasto_id?.descripcion || row.descripcion || "", cantidad: row.cantidad || "", ...(operational ? { dias: row.dias || "" } : {}), precio: money(row.tipoDeGasto_id?.precio), subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) });
