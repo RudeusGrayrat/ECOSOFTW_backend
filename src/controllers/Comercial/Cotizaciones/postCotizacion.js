@@ -58,7 +58,7 @@ const postCotizacion = async (req, res) => {
       totalSinIgv,
       totalConIgv,
       igv,
-      estado,
+      estado: estado || "PENDIENTE",
       facturacion,
       creadoPor
     });

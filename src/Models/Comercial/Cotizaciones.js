@@ -82,7 +82,8 @@ const comercial_cotizacionesSchema = mongoose.Schema(
     estado: {
       type: String,
       enum: ["PENDIENTE", "APROBADO", "ANULADO"],
-      required: true
+      required: true,
+      default: "PENDIENTE"
     },
     creadoPor: {
       type: mongoose.Schema.Types.ObjectId,
