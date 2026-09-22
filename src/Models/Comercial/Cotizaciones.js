@@ -43,7 +43,7 @@ const comercial_cotizacionesSchema = mongoose.Schema(
       {
         tipoDeGasto_id: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "comercial_tipo_de_gastos",
+          ref: "comercial_tipos_de_gastos",
         },
         cantidad: { type: Number },
         dias: { type: Number },
@@ -54,7 +54,7 @@ const comercial_cotizacionesSchema = mongoose.Schema(
       {
         tipoDeGasto_id: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "comercial_tipo_de_gastos",
+          ref: "comercial_tipos_de_gastos",
         },
         cantidad: { type: Number },
         subtotal: { type: Number },

@@ -2,6 +2,7 @@ const fs = require("fs");
 const { randomUUID } = require("crypto");
 const Plantilla = require("../../Models/Herramientas/PlantillaDocumental");
 const Cotizacion = require("../../Models/Comercial/Cotizaciones");
+const TipoDeGasto = require("../../Models/Comercial/TipoDeGastos");
 const Plan = require("../../Models/Operaciones/PlanesTrabajo");
 const Orden = require("../../Models/Operaciones/OrdenesServicio");
 const { templatePath } = require("../../utils/Documentos/paths");
@@ -70,7 +71,7 @@ exports.cotizacion = async (req, res) => {
   const traceId = randomUUID();
   try {
     pdfTrace(traceId, "quote.load.start", { quoteId: req.params.id });
-    const quote = await Cotizacion.findById(req.params.id).populate([{ path: "proyecto_id", populate: { path: "cliente_id" } }, { path: "analisis.parametro_id" }, { path: "gastosOperativos.tipoDeGasto_id" }, { path: "gastosAdministrativos.tipoDeGasto_id" }, "creadoPor actualizadoPor aprobadoPor"]);
+    const quote = await Cotizacion.findById(req.params.id).populate([{ path: "proyecto_id", populate: { path: "cliente_id" } }, { path: "analisis.parametro_id" }, { path: "gastosOperativos.tipoDeGasto_id", model: TipoDeGasto }, { path: "gastosAdministrativos.tipoDeGasto_id", model: TipoDeGasto }, "creadoPor actualizadoPor aprobadoPor"]);
     if (!quote) return res.status(404).json({ message: "Cotización no encontrada", type: "Error" });
     pdfTrace(traceId, "quote.load.done", { quoteId: quote._id.toString(), code: quote.correlativaVisible, analyses: quote.analisis?.length || 0 });
     const client = quote.proyecto_id?.cliente_id || {};
