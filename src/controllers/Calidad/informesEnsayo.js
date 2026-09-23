@@ -75,14 +75,19 @@ const escapeHtml = (value = "") => value.toString()
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#039;");
 const cm = (value) => value * 28.3464567;
+// QR + ID y firma (que ya incorpora nombre y cargo) son dos bloques del mismo
+// sello. Sus bordes superiores deben coincidir; el ID permanece debajo del QR.
+const selloTop = cm(7.05);
+const qrSize = cm(3.5);
+const firmaSize = cm(4.1);
 const selloLayout = {
   qrX: cm(6.14),
   qrY: cm(3.55),
-  qrSize: cm(3.5),
+  qrSize,
   idGap: cm(0.35),
   firmaX: cm(10.45),
-  firmaY: cm(3.1),
-  firmaSize: cm(5),
+  firmaY: selloTop - firmaSize,
+  firmaSize,
 };
 const firmaPadding = cm(0.1);
 const selloAreaPadding = cm(0.28);
