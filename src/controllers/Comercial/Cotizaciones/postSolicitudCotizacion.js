@@ -48,7 +48,7 @@ const postSolicitudCotizacion = async (req, res) => {
         fechaServicio,
         lugarMuestreo: clean(req.body.lugarEjecucion),
         cantidadPuntosParametros: clean(req.body.cantidadPuntosParametros),
-        estado: "PENDIENTE",
+        estado: "ACTIVO",
       });
     } else if (req.body.cantidadPuntosParametros !== undefined) {
       // La solicitud es el historial; el Proyecto conserva el último resumen

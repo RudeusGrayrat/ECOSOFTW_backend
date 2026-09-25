@@ -14,7 +14,8 @@
     "reprocess:informes-liberados:dry": "node scripts/reprocess-liberated-informes.js",
     "reprocess:informes-liberados": "node scripts/reprocess-liberated-informes.js --write",
     "migrate:qrensayo": "node scripts/migrate-qrensayo.js",
-    "migrate:qrensayo:dry": "node scripts/migrate-qrensayo.js --dry-run"
+    "migrate:qrensayo:dry": "node scripts/migrate-qrensayo.js --dry-run",
+    "migrate:proyectos-solicitudes": "node scripts/migrate-proyectos-solicitudes.js"
   },
   "keywords": [],
   "author": "",

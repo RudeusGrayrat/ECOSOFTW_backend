@@ -14,7 +14,9 @@ const comercial_proyectosSchema = mongoose.Schema(
     // (por ejemplo: "3 puntos, PM10 y PM2.5"). No debe convertirse a número.
     cantidadPuntosParametros: { type: String, trim: true },
     lugarMuestreo: { type: String },
-    estado: { type: String, enum: ["ACTIVO", "INACTIVO","COTIZADO", "PENDIENTE"], default: "PENDIENTE" , required: true},
+    // El proyecto no es una cotización. Solo se activa o inactiva como
+    // registro maestro; el avance comercial vive en SolicitudCotizacion.
+    estado: { type: String, enum: ["ACTIVO", "INACTIVO"], default: "ACTIVO", required: true },
   },
   { timestamps: true }
 );

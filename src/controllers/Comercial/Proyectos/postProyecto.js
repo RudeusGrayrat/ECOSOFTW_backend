@@ -8,7 +8,6 @@ const postProyectos = async (req, res) => {
     fechaServicio,
     cantidadPuntosParametros,
     lugarMuestreo,
-    estado,
   } = req.body;
   try {
     if (!cliente_id || !nombre || !servicio) {
@@ -23,7 +22,7 @@ const postProyectos = async (req, res) => {
       fechaServicio,
       cantidadPuntosParametros: typeof cantidadPuntosParametros === "string" ? cantidadPuntosParametros.trim() : cantidadPuntosParametros,
       lugarMuestreo,
-      estado: "PENDIENTE",
+      estado: "ACTIVO",
     });
     await nuevoProyecto.save();
 
