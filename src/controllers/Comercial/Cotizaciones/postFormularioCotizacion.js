@@ -49,7 +49,7 @@ const postFormularioCotizacion = async (req, res) => {
             cliente_id: clienteId,
             nombre: proyecto,
             servicio,
-            cantidadPuntosParametros,
+            cantidadPuntosParametros: typeof cantidadPuntosParametros === "string" ? cantidadPuntosParametros.trim() : cantidadPuntosParametros,
             lugarMuestreo,
             fechaServicio,
         });

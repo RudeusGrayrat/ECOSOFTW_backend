@@ -47,9 +47,14 @@ const postSolicitudCotizacion = async (req, res) => {
         servicio: servicios.join(", "),
         fechaServicio,
         lugarMuestreo: clean(req.body.lugarEjecucion),
-        cantidadPuntosParametros: Number(req.body.cantidadPuntosParametros) || undefined,
+        cantidadPuntosParametros: clean(req.body.cantidadPuntosParametros),
         estado: "PENDIENTE",
       });
+    } else if (req.body.cantidadPuntosParametros !== undefined) {
+      // La solicitud es el historial; el Proyecto conserva el último resumen
+      // visible solicitado por el cliente para que no aparezca vacío al verlo.
+      proyectoDb.cantidadPuntosParametros = clean(req.body.cantidadPuntosParametros);
+      await proyectoDb.save();
     }
 
     const solicitud = await SolicitudCotizacion.create({

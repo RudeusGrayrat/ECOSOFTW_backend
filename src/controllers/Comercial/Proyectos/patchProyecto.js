@@ -23,7 +23,7 @@ const patchProyecto = async (req, res) => {
         if (servicio) findProyecto.servicio = servicio;
         if (cliente_id) findProyecto.cliente_id = cliente_id;
         if (fechaServicio) findProyecto.fechaServicio = fechaServicio;
-        if (cantidadPuntosParametros) findProyecto.cantidadPuntosParametros = cantidadPuntosParametros;
+        if (cantidadPuntosParametros !== undefined) findProyecto.cantidadPuntosParametros = typeof cantidadPuntosParametros === "string" ? cantidadPuntosParametros.trim() : cantidadPuntosParametros;
         if (lugarMuestreo) findProyecto.lugarMuestreo = lugarMuestreo;
         if (estado) findProyecto.estado = estado;
         await findProyecto.save();

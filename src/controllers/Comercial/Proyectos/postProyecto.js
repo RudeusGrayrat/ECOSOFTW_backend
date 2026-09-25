@@ -21,7 +21,7 @@ const postProyectos = async (req, res) => {
       nombre,
       servicio,
       fechaServicio,
-      cantidadPuntosParametros,
+      cantidadPuntosParametros: typeof cantidadPuntosParametros === "string" ? cantidadPuntosParametros.trim() : cantidadPuntosParametros,
       lugarMuestreo,
       estado: "PENDIENTE",
     });
