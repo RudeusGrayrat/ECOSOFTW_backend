@@ -5,6 +5,9 @@ const versionSchema = new mongoose.Schema({
   tipo: { type: String, enum: ["BORRADOR", "PRELIMINAR", "OFICIAL"], default: "BORRADOR" },
   original: { path: String, filename: String, bytes: Number },
   publicado: { path: String, filename: String, bytes: Number },
+  // Permite regenerar informes oficiales creados antes de una mejora visual
+  // del sello sin alterar su versión documental ni pedir una nueva carga.
+  selloLayoutVersion: { type: Number, default: 0 },
   procesadoPor: { type: mongoose.Schema.Types.ObjectId, ref: "UserEcosoft" },
   creadoEn: { type: Date, default: Date.now },
 }, { _id: false });

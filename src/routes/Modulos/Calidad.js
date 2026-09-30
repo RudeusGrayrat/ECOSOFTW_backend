@@ -9,6 +9,7 @@ router.get("/informes-ensayo/reportes/oficiales", requireAuth, requirePermission
 router.post("/informes-ensayo/reportes/oficiales", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "REPORTAR"), informes.descargarOficialesReporte);
 router.post("/informes-ensayo/bulk/descargar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "REPORTAR"), informes.descargarSeleccionados);
 router.post("/informes-ensayo/bulk/aprobar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.aprobarMasivo);
+router.patch("/informes-ensayo/bulk/metadatos", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "EDITAR"), informes.actualizarMetadatosMasivo);
 router.post("/informes-ensayo/bulk/liberar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ENVIAR"), informes.liberarMasivo);
 router.post("/informes-ensayo/bulk/definitivo", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "ELIMINAR"), informes.eliminarDefinitivoMasivo);
 router.get("/informes-ensayo/configuracion", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "VER"), informes.configuracion);
@@ -19,6 +20,7 @@ router.get("/informes-ensayo/configuracion/marca-agua/:tipo/archivo", requireAut
 router.post("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.uploadAsset, informes.actualizarMarcaAgua);
 router.delete("/informes-ensayo/configuracion/marca-agua/:tipo", requireAuth, requirePermission("CALIDAD", "CONFIGURACION", "CREAR"), informes.eliminarMarcaAgua);
 router.post("/informes-ensayo/procesar", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "CREAR"), informes.upload, informes.procesar);
+router.patch("/informes-ensayo/:id", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "EDITAR"), informes.actualizarMetadatos);
 router.get("/informes-ensayo/:id/archivo", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "VER"), informes.archivoAdmin);
 router.get("/informes-ensayo/:id/observaciones", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "VER"), informes.getObservaciones);
 router.post("/informes-ensayo/:id/observaciones", requireAuth, requirePermission("CALIDAD", "INFORMES DE ENSAYO", "APROBAR"), informes.guardarObservaciones);

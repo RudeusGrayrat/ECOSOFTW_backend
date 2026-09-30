@@ -75,20 +75,17 @@ const escapeHtml = (value = "") => value.toString()
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#039;");
 const cm = (value) => value * 28.3464567;
-// QR + ID y firma (que ya incorpora nombre y cargo) son dos bloques del mismo
-// sello. Sus bordes superiores deben coincidir; el ID permanece debajo del QR.
-const selloTop = cm(7.05);
-const qrSize = cm(3.5);
-const firmaSize = cm(4.1);
-const selloLayout = {
-  qrX: cm(6.14),
-  qrY: cm(3.55),
-  qrSize,
+// QR + ID y firma (que ya incorpora nombre y cargo) forman un único sello.
+// Nunca se usan coordenadas absolutas: los informes pueden tener anchos
+// distintos y el bloque debe quedar centrado en cada página.
+const selloDimension = {
+  qrSize: cm(3.5),
+  firmaSize: cm(4.1),
+  gap: cm(0.9),
   idGap: cm(0.35),
-  firmaX: cm(10.45),
-  firmaY: selloTop - firmaSize,
-  firmaSize,
 };
+const selloCandidateTops = [cm(9.2), cm(13.2), cm(17.2)];
+const officialSealLayoutVersion = 2;
 const firmaPadding = cm(0.1);
 const selloAreaPadding = cm(0.28);
 const selloOccupancy = {
@@ -239,6 +236,7 @@ const requiresOfficialReprocess = (report, version) => {
   if (!["LIBERADO", "DISPONIBLE"].includes(estado)) return false;
   if (!version?.publicado?.path) return true;
   if (normalize(version?.tipo) !== "OFICIAL") return true;
+  if (Number(version?.selloLayoutVersion || 0) < officialSealLayoutVersion) return true;
   return version?.publicado?.filename !== officialFilenameFor(report.codigo);
 };
 
@@ -312,11 +310,27 @@ function verifyViewToken(token) {
   return { id, version: Number(version) };
 }
 
-function sealBounds() {
-  const minX = Math.min(selloLayout.qrX, selloLayout.firmaX) - selloAreaPadding;
-  const minY = Math.min(selloLayout.qrY - selloLayout.idGap, selloLayout.firmaY) - selloAreaPadding;
-  const maxX = Math.max(selloLayout.qrX + selloLayout.qrSize, selloLayout.firmaX + selloLayout.firmaSize) + selloAreaPadding;
-  const maxY = Math.max(selloLayout.qrY + selloLayout.qrSize, selloLayout.firmaY + selloLayout.firmaSize) + selloAreaPadding;
+function sealLayoutFor(page, top) {
+  const { width } = page.getSize();
+  const groupWidth = selloDimension.qrSize + selloDimension.gap + selloDimension.firmaSize;
+  const qrX = (width - groupWidth) / 2;
+  const firmaX = qrX + selloDimension.qrSize + selloDimension.gap;
+  return {
+    qrX,
+    qrY: top - selloDimension.qrSize,
+    qrSize: selloDimension.qrSize,
+    idGap: selloDimension.idGap,
+    firmaX,
+    firmaY: top - selloDimension.firmaSize,
+    firmaSize: selloDimension.firmaSize,
+  };
+}
+
+function sealBounds(layout) {
+  const minX = Math.min(layout.qrX, layout.firmaX) - selloAreaPadding;
+  const minY = Math.min(layout.qrY - layout.idGap, layout.firmaY) - selloAreaPadding;
+  const maxX = Math.max(layout.qrX + layout.qrSize, layout.firmaX + layout.firmaSize) + selloAreaPadding;
+  const maxY = Math.max(layout.qrY + layout.qrSize, layout.firmaY + layout.firmaSize) + selloAreaPadding;
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
@@ -374,13 +388,13 @@ async function renderPdfPageToPpm(pdfBuffer, pageNumber) {
   }
 }
 
-async function isSealAreaAvailable(pdfBuffer, page, pageNumber) {
+async function isSealAreaAvailable(pdfBuffer, page, pageNumber, layout) {
   try {
     const rendered = await renderPdfPageToPpm(pdfBuffer, pageNumber);
     const { width: pageWidth, height: pageHeight } = page.getSize();
     const scaleX = rendered.width / pageWidth;
     const scaleY = rendered.height / pageHeight;
-    const bounds = sealBounds();
+    const bounds = sealBounds(layout);
     const xStart = Math.max(0, Math.floor(bounds.x * scaleX));
     const xEnd = Math.min(rendered.width, Math.ceil((bounds.x + bounds.width) * scaleX));
     const yStart = Math.max(0, Math.floor((pageHeight - bounds.y - bounds.height) * scaleY));
@@ -404,32 +418,35 @@ async function isSealAreaAvailable(pdfBuffer, page, pageNumber) {
   }
 }
 
-async function selectSealPageIndex(pdf, inspectionBuffer) {
+async function selectSealPlacement(pdf, inspectionBuffer) {
   const pages = pdf.getPages();
   if (!pages.length) throw new Error("El PDF no tiene páginas para procesar");
-  const firstAvailable = await isSealAreaAvailable(inspectionBuffer, pages[0], 1);
-  if (firstAvailable !== false) return 0;
 
-  const lastIndex = pages.length - 1;
-  if (lastIndex > 0) {
-    const lastAvailable = await isSealAreaAvailable(inspectionBuffer, pages[lastIndex], lastIndex + 1);
-    if (lastAvailable !== false) return lastIndex;
+  // Primero se intenta la primera página, después la última. Cada una ofrece
+  // tres alturas; así el pie de página no descarta toda una zona blanca útil.
+  const pageIndexes = pages.length === 1 ? [0] : [0, pages.length - 1];
+  for (const pageIndex of pageIndexes) {
+    const page = pages[pageIndex];
+    const { height } = page.getSize();
+    for (const top of selloCandidateTops) {
+      const layout = sealLayoutFor(page, top);
+      if (sealBounds(layout).y < cm(2.5) || sealBounds(layout).y + sealBounds(layout).height > height - cm(2)) continue;
+      const available = await isSealAreaAvailable(inspectionBuffer, page, pageIndex + 1, layout);
+      if (available !== false) return { pageIndex, layout };
+    }
   }
 
-  return pages.length;
+  return null;
 }
 
 function drawValidationHeader(page, report, font) {
   const { width, height } = page.getSize();
-  page.drawText("CONSTANCIA DE VERIFICACION DEL INFORME", {
-    x: cm(2.2),
-    y: height - cm(4),
-    size: 16,
-    font,
-    color: rgb(0.05, 0.22, 0.15),
-  });
-  page.drawText(`Informe: ${report.codigo || ""}`, { x: cm(2.2), y: height - cm(5.1), size: 12, font, color: rgb(0, 0, 0) });
-  page.drawText(`ID de acceso: ${report.idAcceso || ""}`, { x: cm(2.2), y: height - cm(5.9), size: 12, font, color: rgb(0, 0, 0) });
+  const centered = (text, y, size, color = rgb(0, 0, 0)) => {
+    page.drawText(text, { x: (width - font.widthOfTextAtSize(text, size)) / 2, y, size, font, color });
+  };
+  centered("CONSTANCIA DE VERIFICACION DEL INFORME", height - cm(4), 16, rgb(0.05, 0.22, 0.15));
+  centered(`Informe: ${report.codigo || ""}`, height - cm(5.1), 12);
+  centered(`ID de acceso: ${report.idAcceso || ""}`, height - cm(5.9), 12);
   page.drawLine({ start: { x: cm(2.2), y: height - cm(6.5) }, end: { x: width - cm(2.2), y: height - cm(6.5) }, thickness: 1, color: rgb(0.1, 0.55, 0.32) });
 }
 
@@ -467,33 +484,38 @@ async function processPdf(source, report, options = {}) {
   }
 
   let sealPage = null;
+  let sealLayout = null;
   let font = null;
 
   if (includeAccessSeal || includeFirma) {
     const inspectionBuffer = Buffer.from(await pdf.save());
     pdf = await PDFDocument.load(inspectionBuffer);
-    const sealPageIndex = await selectSealPageIndex(pdf, inspectionBuffer);
+    const placement = await selectSealPlacement(pdf, inspectionBuffer);
     const pages = pdf.getPages();
     font = await pdf.embedFont(StandardFonts.Helvetica);
 
-    if (sealPageIndex >= pages.length) {
+    if (!placement) {
       const { width, height } = pages[0].getSize();
       sealPage = pdf.addPage([width, height]);
       drawValidationHeader(sealPage, report, font);
+      // La constancia no reutiliza el sello de una página normal: centra el
+      // conjunto bajo su encabezado y evita el efecto "pegado a la izquierda".
+      sealLayout = sealLayoutFor(sealPage, height * 0.52);
     } else {
-      sealPage = pages[sealPageIndex];
+      sealPage = pages[placement.pageIndex];
+      sealLayout = placement.layout;
     }
   }
 
   if (includeAccessSeal) {
     const qr = await QRCode.toDataURL(portalUrl(), { margin: 1, width: 280 });
     const qrImage = await pdf.embedPng(qr);
-    const qrX = selloLayout.qrX;
-    const qrY = selloLayout.qrY;
-    const qrSize = selloLayout.qrSize;
+    const qrX = sealLayout.qrX;
+    const qrY = sealLayout.qrY;
+    const qrSize = sealLayout.qrSize;
     const idText = `ID: ${report.idAcceso}`;
     const idX = qrX + ((qrSize - font.widthOfTextAtSize(idText, 11)) / 2);
-    const idY = qrY - selloLayout.idGap;
+    const idY = qrY - sealLayout.idGap;
 
     sealPage.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 24, color: rgb(1, 1, 1), opacity: 0.92 });
     sealPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
@@ -505,13 +527,13 @@ async function processPdf(source, report, options = {}) {
     const signatureImage = config.firma.mimetype === "image/png"
       ? await pdf.embedPng(signatureBytes)
       : await pdf.embedJpg(signatureBytes);
-    const firmaDrawableSize = selloLayout.firmaSize - (firmaPadding * 2);
+    const firmaDrawableSize = sealLayout.firmaSize - (firmaPadding * 2);
     const scale = Math.min(firmaDrawableSize / signatureImage.width, firmaDrawableSize / signatureImage.height);
     const signatureWidth = signatureImage.width * scale;
     const signatureHeight = signatureImage.height * scale;
     sealPage.drawImage(signatureImage, {
-      x: selloLayout.firmaX + firmaPadding + ((firmaDrawableSize - signatureWidth) / 2),
-      y: selloLayout.firmaY + firmaPadding + ((firmaDrawableSize - signatureHeight) / 2),
+      x: sealLayout.firmaX + firmaPadding + ((firmaDrawableSize - signatureWidth) / 2),
+      y: sealLayout.firmaY + firmaPadding + ((firmaDrawableSize - signatureHeight) / 2),
       width: signatureWidth,
       height: signatureHeight,
     });
@@ -878,6 +900,103 @@ exports.listar = async (req, res) => {
   }
 };
 
+// Solo corrige datos administrativos mientras el informe no sea oficial.
+// El PDF, sus versiones, QR e ID de acceso no se alteran desde esta acción.
+exports.actualizarMetadatos = async (req, res) => {
+  try {
+    const report = await Informe.findById(req.params.id);
+    if (!report || report.papelera) return res.status(404).json({ message: "Informe no encontrado", type: "Error" });
+    if (["LIBERADO", "DISPONIBLE"].includes(report.estado)) {
+      return res.status(409).json({
+        message: "Un informe liberado no puede editarse. Debe emitirse una nueva versión para conservar la trazabilidad.",
+        type: "Advertencia",
+      });
+    }
+
+    const codigo = normalize(req.body.codigo);
+    const planMonitoreo = normalize(req.body.planMonitoreo);
+    const cliente = normalize(req.body.cliente);
+    const matriz = normalize(req.body.matriz);
+    const acreditacion = normalize(req.body.acreditacion || report.acreditacion);
+
+    if (!codigo) return res.status(400).json({ message: "El código es obligatorio", type: "Advertencia" });
+    if (!tiposAcreditacion.includes(acreditacion)) return res.status(400).json({ message: "Tipo de acreditación no válido", type: "Advertencia" });
+
+    const duplicate = await Informe.exists({ codigo, _id: { $ne: report._id } });
+    if (duplicate) return res.status(409).json({ message: "Ya existe otro informe con ese código", type: "Advertencia" });
+
+    const previous = [report.codigo, report.planMonitoreo, report.cliente, report.matriz, report.acreditacion].join(" | ");
+    report.codigo = codigo;
+    report.planMonitoreo = planMonitoreo;
+    report.cliente = cliente;
+    report.matriz = matriz;
+    report.acreditacion = acreditacion;
+    audit(report, req, "METADATOS CORREGIDOS", `Antes: ${previous}`);
+    await report.save();
+
+    return res.json({ message: "Datos del informe actualizados correctamente", type: "Correcto", data: report });
+  } catch (error) {
+    return res.status(500).json({ message: error.message, type: "Error" });
+  }
+};
+
+exports.actualizarMetadatosMasivo = async (req, res) => {
+  try {
+    const rows = Array.isArray(req.body?.informes) ? req.body.informes : [];
+    if (!rows.length) return res.status(400).json({ message: "Selecciona al menos un informe", type: "Advertencia" });
+
+    const ids = rows.map((row) => row?.id).filter((id) => mongoose.isValidObjectId(id));
+    if (ids.length !== rows.length) return res.status(400).json({ message: "Hay informes no válidos en la edición", type: "Advertencia" });
+    if (new Set(ids.map(String)).size !== ids.length) return res.status(400).json({ message: "Un informe no puede repetirse en la edición", type: "Advertencia" });
+
+    const reports = await Informe.find({ _id: { $in: ids }, papelera: { $ne: true } });
+    const byId = new Map(reports.map((report) => [report._id.toString(), report]));
+    const normalizedRows = rows.map((row) => ({
+      id: row.id.toString(),
+      codigo: normalize(row.codigo),
+      planMonitoreo: normalize(row.planMonitoreo),
+      cliente: normalize(row.cliente),
+      matriz: normalize(row.matriz),
+      acreditacion: normalize(row.acreditacion),
+    }));
+    const duplicateCodes = normalizedRows.map((row) => row.codigo).filter((code, index, all) => !code || all.indexOf(code) !== index);
+    if (duplicateCodes.length) return res.status(400).json({ message: "Cada informe debe tener un código único", type: "Advertencia" });
+
+    const resultado = { procesados: 0, omitidos: [] };
+    for (const row of normalizedRows) {
+      const report = byId.get(row.id);
+      try {
+        if (!report) throw new Error("no encontrado o en papelera");
+        if (["LIBERADO", "DISPONIBLE"].includes(report.estado)) throw new Error("está liberado");
+        if (!row.codigo) throw new Error("el código es obligatorio");
+        if (!tiposAcreditacion.includes(row.acreditacion)) throw new Error("la acreditación no es válida");
+        const duplicate = await Informe.exists({ codigo: row.codigo, _id: { $ne: report._id } });
+        if (duplicate) throw new Error(`el código ${row.codigo} ya está en uso`);
+
+        const previous = [report.codigo, report.planMonitoreo, report.cliente, report.matriz, report.acreditacion].join(" | ");
+        report.codigo = row.codigo;
+        report.planMonitoreo = row.planMonitoreo;
+        report.cliente = row.cliente;
+        report.matriz = row.matriz;
+        report.acreditacion = row.acreditacion;
+        audit(report, req, "METADATOS CORREGIDOS MASIVAMENTE", `Antes: ${previous}`);
+        await report.save();
+        resultado.procesados += 1;
+      } catch (error) {
+        resultado.omitidos.push(`${report?.codigo || row.codigo || row.id}: ${error.message}`);
+      }
+    }
+
+    return res.json({
+      message: `${resultado.procesados} informe${resultado.procesados === 1 ? "" : "s"} actualizado${resultado.procesados === 1 ? "" : "s"}`,
+      type: resultado.omitidos.length ? "Advertencia" : "Correcto",
+      ...resultado,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message, type: "Error" });
+  }
+};
+
 async function guardarBorrador(req, file, body, metadata = {}) {
   const { codigo: codigoBody, reemplazar = "false", proyectoId, clienteId, tipoPlantilla = "SIN_ACREDITACION" } = body;
   const parsed = parseInformeFilename(file.originalname);
@@ -1094,6 +1213,7 @@ async function regenerarVersion(report, req, tipoVersion, tipoMarcaAgua, include
   const filename = filenameFor(report.codigo, report.versionActual, tipoVersion === "OFICIAL" ? "oficial" : "preliminar", version.original.filename);
   const processedPath = await saveFile(report.codigo, report.versionActual, filename, processedBuffer);
   version.tipo = tipoVersion;
+  if (tipoVersion === "OFICIAL") version.selloLayoutVersion = officialSealLayoutVersion;
   version.publicado = { path: processedPath, filename, bytes: processedBuffer.length };
   version.procesadoPor = actor(req);
   version.creadoEn = new Date();
