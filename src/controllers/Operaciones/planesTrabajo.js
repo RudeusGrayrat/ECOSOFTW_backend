@@ -2,6 +2,7 @@ const Cotizacion = require("../../Models/Comercial/Cotizaciones");
 const Solicitud = require("../../Models/Comercial/SolicitudesCotizacion");
 const Plan = require("../../Models/Operaciones/PlanesTrabajo");
 const Orden = require("../../Models/Operaciones/OrdenesServicio");
+const escapeRegExp = require("../../utils/escapeRegex");
 
 const mapItem = (item) => { const parameter = item.parametroSnapshot || item.parametro_id || {}; return { matriz: parameter.tipoDeAnalisis || "", parametro: parameter.parametro || "", metodologia: parameter.metodo || "", cantidad: item.cantidad || 0, acreditacion: parameter.acreditadoPor || "", laboratorio: item.proveedor || "" }; };
 
@@ -41,14 +42,35 @@ exports.crearOrden = async (req, res) => {
   } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
 };
 
-exports.listarPlanes = async (_req, res) => {
-  const data = await Plan.find().sort({ createdAt: -1 }).populate("cotizacion_id analistaOperaciones elaboradoPor");
-  return res.json({ data });
+const listDocuments = async (req, res, Model, populate, searchableFields) => {
+  try {
+    const { page, limit, search = "" } = req.query;
+    const filter = search
+      ? { $or: searchableFields.map((field) => ({ [field]: { $regex: escapeRegExp(search.trim()), $options: "i" } })) }
+      : {};
+    const hasPagination = page !== undefined || limit !== undefined;
+    if (!hasPagination) {
+      const data = await Model.find(filter).sort({ createdAt: -1 }).populate(populate);
+      return res.json({ data, total: data.length });
+    }
+    const safePage = Math.max(0, Number(page) || 0);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 10));
+    const [data, total] = await Promise.all([
+      Model.find(filter).sort({ createdAt: -1 }).skip(safePage * safeLimit).limit(safeLimit).populate(populate),
+      Model.countDocuments(filter),
+    ]);
+    return res.json({ data, total });
+  } catch (error) {
+    return res.status(500).json({ message: error.message, type: "Error" });
+  }
 };
 
-exports.listarOrdenes = async (_req, res) => {
-  const data = await Orden.find().sort({ createdAt: -1 }).populate("plan_id cotizacion_id");
-  return res.json({ data });
+exports.listarPlanes = async (req, res) => {
+  return listDocuments(req, res, Plan, "cotizacion_id analistaOperaciones elaboradoPor", ["codigo", "estado", "proyecto.nombre", "proyecto.planta"]);
+};
+
+exports.listarOrdenes = async (req, res) => {
+  return listDocuments(req, res, Orden, "plan_id cotizacion_id", ["codigo", "estado", "proyecto.nombre", "proyecto.planta"]);
 };
 
 exports.actualizarPlan = async (req, res) => {

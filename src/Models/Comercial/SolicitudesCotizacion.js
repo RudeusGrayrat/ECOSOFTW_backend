@@ -10,6 +10,25 @@ const stationSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const parameterRequestSchema = new mongoose.Schema(
+  {
+    parametro_id: { type: mongoose.Schema.Types.ObjectId, ref: "comercial_parametros" },
+    cantidadPuntos: { type: Number, min: 1, default: 1 },
+  },
+  { _id: false }
+);
+
+const attachmentSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    nombre: { type: String, required: true },
+    archivo: { type: String, required: true },
+    mimetype: { type: String },
+    bytes: { type: Number },
+  },
+  { _id: false }
+);
+
 const comercialSolicitudCotizacionSchema = new mongoose.Schema(
   {
     cliente_id: { type: mongoose.Schema.Types.ObjectId, ref: "comercial_clientes", required: true },
@@ -22,10 +41,23 @@ const comercialSolicitudCotizacionSchema = new mongoose.Schema(
     tipoDocumento: [{ type: String, trim: true }],
     nombrePlanta: { type: String, trim: true },
     lugarEjecucion: { type: String, trim: true },
+    ubicacion: {
+      departamento: { type: String, trim: true },
+      provincia: { type: String, trim: true },
+      distrito: { type: String, trim: true },
+      referencia: { type: String, trim: true },
+    },
+    parametrosSolicitados: [parameterRequestSchema],
+    requisitosIngreso: [{ type: String, trim: true }],
+    induccionHoras: { type: Number, min: 0 },
+    peligrosEspecificos: [{ type: String, trim: true }],
+    zonaUtm: { type: String, trim: true },
+    datum: { type: String, trim: true },
     condicionesIngreso: { type: String, trim: true },
     trabajoAltoRiesgo: { type: String, trim: true },
     accesibilidadPuntos: { type: String, trim: true },
     estaciones: [stationSchema],
+    adjuntos: [attachmentSchema],
     destinatarioInforme: {
       razonSocial: { type: String, trim: true },
       ruc: { type: String, trim: true },

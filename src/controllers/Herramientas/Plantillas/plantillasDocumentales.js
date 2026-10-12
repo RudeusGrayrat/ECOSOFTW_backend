@@ -4,6 +4,7 @@ const multer = require("multer");
 const { randomUUID } = require("crypto");
 const Plantilla = require("../../../Models/Herramientas/PlantillaDocumental");
 const { ensureTemplatesRoot, templatePath } = require("../../../utils/Documentos/paths");
+const escapeRegExp = require("../../../utils/escapeRegex");
 
 const isDocx = (file) => file?.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file?.originalname?.toLowerCase().endsWith(".docx");
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 }, fileFilter: (_req, file, cb) => cb(null, isDocx(file)) });
@@ -17,7 +18,24 @@ const saveFile = (file) => {
   return fileName;
 };
 
-exports.listar = async (_req, res) => res.json({ data: await Plantilla.find().sort({ tipo: 1 }).populate("actualizadoPor", "colaborador userName") });
+exports.listar = async (req, res) => {
+  const { page, limit, search = "" } = req.query;
+  const filter = search
+    ? { $or: ["nombre", "tipo", "version", "estado"].map((field) => ({ [field]: { $regex: escapeRegExp(search.trim()), $options: "i" } })) }
+    : {};
+  const hasPagination = page !== undefined || limit !== undefined;
+  if (!hasPagination) {
+    const data = await Plantilla.find(filter).sort({ tipo: 1 }).populate("actualizadoPor", "colaborador userName");
+    return res.json({ data, total: data.length });
+  }
+  const safePage = Math.max(0, Number(page) || 0);
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 10));
+  const [data, total] = await Promise.all([
+    Plantilla.find(filter).sort({ tipo: 1 }).skip(safePage * safeLimit).limit(safeLimit).populate("actualizadoPor", "colaborador userName"),
+    Plantilla.countDocuments(filter),
+  ]);
+  return res.json({ data, total });
+};
 
 exports.guardar = async (req, res) => {
   try {

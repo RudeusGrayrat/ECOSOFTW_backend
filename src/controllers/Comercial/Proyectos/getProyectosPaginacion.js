@@ -3,7 +3,7 @@ const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
 
 const getProyectosPagination = async (req, res) => {
     try {
-        const { page = 1, limit = 10, search = "", cliente = "", estado = "" } = req.query;
+        const { page = 0, limit = 10, search = "", cliente = "", estado = "" } = req.query;
         const query = {};
         if (search) {
             const escapedSearch = escapeRegExp(search);

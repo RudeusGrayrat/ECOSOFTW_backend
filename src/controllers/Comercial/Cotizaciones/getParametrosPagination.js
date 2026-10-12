@@ -18,7 +18,6 @@ const getParametrosPagination = async (req, res) => {
     }
     if (tipoDeAnalisis) {
       query.tipoDeAnalisis = tipoDeAnalisis;
-      console.log("Query con tipoDeAnalisis:", query);
     }
     const [data, total] = await Promise.all([
       Comercial_Parametros.find(query)
@@ -28,7 +27,6 @@ const getParametrosPagination = async (req, res) => {
         .sort({ createdAt: -1 }),
       Comercial_Parametros.countDocuments(query),
     ]);
-    console.log("Data obtenida:", data);
     return res.status(200).json({ data, total });
   } catch (error) {
     return res.status(500).json({ message: error.message });

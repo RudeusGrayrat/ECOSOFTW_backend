@@ -16,6 +16,8 @@ const postProyectos = require("../../controllers/Comercial/Proyectos/postProyect
 const postTiposDeGastos = require("../../controllers/Comercial/Cotizaciones/postTipoDeGastos");
 const postParametro = require("../../controllers/Comercial/Cotizaciones/postParametros");
 const postSolicitudCotizacion = require("../../controllers/Comercial/Cotizaciones/postSolicitudCotizacion");
+const solicitudAdjuntos = require("../../controllers/Comercial/Cotizaciones/solicitudAdjuntos");
+const { consultaRuc, consultaDocumento } = require("../../controllers/Comercial/Clientes/consultaRuc");
 const postCotizacion = require("../../controllers/Comercial/Cotizaciones/postCotizacion");
 const postNuevaVersionCotizacion = require("../../controllers/Comercial/Cotizaciones/postNuevaVersionCotizacion");
 const getSolicitudesCotizacion = require("../../controllers/Comercial/Cotizaciones/getSolicitudesCotizacion");
@@ -33,6 +35,8 @@ comercialRouter.get("/getParametrosPaginacion", getParametrosPagination);
 comercialRouter.get("/getTiposDeGastosPaginacion", getTiposDeGastosPaginacion);
 comercialRouter.get("/proveedores", proveedores.listar);
 comercialRouter.get("/solicitudes-cotizacion", getSolicitudesCotizacion);
+comercialRouter.get("/consulta-ruc/:ruc", consultaRuc);
+comercialRouter.get("/consulta-documento/:numero", consultaDocumento);
 
 comercialRouter.patch("/patchCliente/:id", patchCliente);
 comercialRouter.patch("/patchCotizacion/:id", patchCotizacion);
@@ -45,7 +49,7 @@ comercialRouter.post("/postCliente", postCliente);
 comercialRouter.post("/postCotizacion", postCotizacion);
 comercialRouter.post("/cotizaciones/:id/nueva-version", postNuevaVersionCotizacion);
 comercialRouter.post("/cotizaciones/:id/pdf", documentos.cotizacion);
-comercialRouter.post("/postFormularioCotizacion", postSolicitudCotizacion);
+comercialRouter.post("/postFormularioCotizacion", solicitudAdjuntos.upload, postSolicitudCotizacion);
 comercialRouter.post("/postProyecto", postProyectos);
 comercialRouter.post("/postParametro", postParametro);
 comercialRouter.post("/postTiposDeGastos", postTiposDeGastos);

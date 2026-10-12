@@ -9,11 +9,11 @@ const getClientesPaginacion = async (req, res) => {
       const escapedSearch = escapeRegExp(search);
       const regex = new RegExp(escapedSearch, "i");
       query.$or = [
-        { nombreComercial: regex },
-        { razonSocial: regex },
-        { ruc: regex },
-        { direccion: regex },
-        { correo: regex },
+        { cliente: regex },
+        { numeroDocumento: regex },
+        { nombreContacto: regex },
+        { direccionLegal: regex },
+        { correoElectronico: regex },
         { telefono: regex },
       ];
     }

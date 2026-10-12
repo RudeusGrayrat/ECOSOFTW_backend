@@ -94,6 +94,8 @@ const selloOccupancy = {
   darkThreshold: Number(process.env.PDF_SEAL_DARK_THRESHOLD || 210),
   maxDarkRatio: Number(process.env.PDF_SEAL_MAX_DARK_RATIO || 0.012),
 };
+const selloSpacing = cm(0.35);
+const footerProbeHeight = cm(5);
 
 const tiposMarcaAgua = ["INACAL", "NAC", "SIN_ACREDITACION", "VERSION_PRELIMINAR"];
 const tiposAcreditacion = ["INACAL", "NAC", "SIN_ACREDITACION"];
@@ -418,15 +420,82 @@ async function isSealAreaAvailable(pdfBuffer, page, pageNumber, layout) {
   }
 }
 
+function darkRows(rendered) {
+  const rows = new Uint16Array(rendered.height);
+  for (let y = 0; y < rendered.height; y += 1) {
+    let count = 0;
+    for (let x = 0; x < rendered.width; x += 1) {
+      const index = (y * rendered.width + x) * 3;
+      const luminance = (rendered.data[index] * 0.299) + (rendered.data[index + 1] * 0.587) + (rendered.data[index + 2] * 0.114);
+      if (luminance < selloOccupancy.darkThreshold) count += 1;
+    }
+    rows[y] = Math.min(count, 65535);
+  }
+  return rows;
+}
+
+async function centeredSealLayout(pdfBuffer, page, pageNumber) {
+  try {
+    const rendered = await renderPdfPageToPpm(pdfBuffer, pageNumber);
+    const { height: pageHeight } = page.getSize();
+    const scaleY = rendered.height / pageHeight;
+    const rows = darkRows(rendered);
+    // Dos píxeles oscuros evitan que la marca de agua tenue se confunda con
+    // contenido, pero permiten detectar textos y líneas finas del informe.
+    const hasInk = (row) => rows[row] >= 2;
+    const footerSearchStart = Math.max(0, Math.floor(rendered.height - (footerProbeHeight * scaleY)));
+    let footerRow = -1;
+    for (let row = footerSearchStart; row < rendered.height; row += 1) {
+      if (hasInk(row)) {
+        footerRow = row;
+        break;
+      }
+    }
+    if (footerRow < 0) return { analyzed: true, layout: null };
+
+    const safetyRows = Math.ceil(selloSpacing * scaleY);
+    let contentRow = -1;
+    for (let row = footerRow - safetyRows; row >= 0; row -= 1) {
+      if (hasInk(row)) {
+        contentRow = row;
+        break;
+      }
+    }
+    if (contentRow < 0) return { analyzed: true, layout: null };
+
+    const contentBottom = pageHeight - ((contentRow + 1) / scaleY);
+    const footerTop = pageHeight - (footerRow / scaleY);
+    const availableBottom = footerTop + selloSpacing;
+    const availableTop = contentBottom - selloSpacing;
+    const baseLayout = sealLayoutFor(page, 0);
+    const baseBounds = sealBounds(baseLayout);
+    const availableHeight = availableTop - availableBottom;
+    if (availableHeight < baseBounds.height) return { analyzed: true, layout: null };
+
+    const targetBottom = availableBottom + ((availableHeight - baseBounds.height) / 2);
+    const top = targetBottom - baseBounds.y;
+    return { analyzed: true, layout: sealLayoutFor(page, top) };
+  } catch (error) {
+    console.warn(`No se pudo calcular el espacio entre contenido y pie con ${selloOccupancy.renderer}: ${error.message}`);
+    return { analyzed: false, layout: null };
+  }
+}
+
 async function selectSealPlacement(pdf, inspectionBuffer) {
   const pages = pdf.getPages();
   if (!pages.length) throw new Error("El PDF no tiene páginas para procesar");
 
-  // Primero se intenta la primera página, después la última. Cada una ofrece
-  // tres alturas; así el pie de página no descarta toda una zona blanca útil.
+  // Primero se intenta la primera página, después la última. El sello se
+  // centra estrictamente entre el final del contenido y el inicio del pie.
   const pageIndexes = pages.length === 1 ? [0] : [0, pages.length - 1];
   for (const pageIndex of pageIndexes) {
     const page = pages[pageIndex];
+    const centered = await centeredSealLayout(inspectionBuffer, page, pageIndex + 1);
+    if (centered.layout) return { pageIndex, layout: centered.layout };
+
+    // Si no se pudo rasterizar la página, se conserva el comportamiento seguro
+    // anterior. Si sí se analizó y no cabe, no se fuerza el sello allí.
+    if (centered.analyzed) continue;
     const { height } = page.getSize();
     for (const top of selloCandidateTops) {
       const layout = sealLayoutFor(page, top);
@@ -517,7 +586,6 @@ async function processPdf(source, report, options = {}) {
     const idX = qrX + ((qrSize - font.widthOfTextAtSize(idText, 11)) / 2);
     const idY = qrY - sealLayout.idGap;
 
-    sealPage.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 24, color: rgb(1, 1, 1), opacity: 0.92 });
     sealPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
     sealPage.drawText(idText, { x: idX, y: idY, size: 11, font, color: rgb(0, 0, 0) });
   }
