@@ -19,7 +19,7 @@ const postSolicitudCotizacion = async (req, res) => {
   const servicios = cleanList(req.body.servicios);
   const contacto = parseJson(req.body.contacto, {});
   // El proyecto es opcional para solicitudes que llegan desde cadena de custodia.
-  const nombreProyecto = clean(proyecto) || "SEGÚN CADENA DE CUSTODIA";
+  const nombreProyecto = clean(proyecto) || "según cadena de custodia";
 
   if (!cliente || !numeroDocumento || !servicios.length || !fechaServicio) {
     return res.status(400).json({ message: "Completa los datos obligatorios de identificación, servicio y fecha.", type: "Advertencia" });
@@ -34,7 +34,7 @@ const postSolicitudCotizacion = async (req, res) => {
       });
     }
 
-    let proyectoDb = await ComercialProyectos.findOne({ cliente_id: clienteDb._id, nombre: nombreProyecto }).sort({ createdAt: -1 });
+    let proyectoDb = await ComercialProyectos.findOne({ cliente_id: clienteDb._id, nombre: new RegExp(`^${nombreProyecto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }).sort({ createdAt: -1 });
     if (!proyectoDb) {
       proyectoDb = await ComercialProyectos.create({
         cliente_id: clienteDb._id, nombre: nombreProyecto, servicio: servicios.join(", "), fechaServicio,
@@ -45,8 +45,10 @@ const postSolicitudCotizacion = async (req, res) => {
       await proyectoDb.save();
     }
 
-    const savedAttachments = await saveIncoming(req.files || []);
+    const attachmentFiles = req.files || [];
+    let savedAttachments = [];
     try {
+      savedAttachments = await saveIncoming(attachmentFiles);
       const solicitud = await SolicitudCotizacion.create({
         cliente_id: clienteDb._id, proyecto_id: proyectoDb._id, servicios, frecuenciaAire: clean(req.body.frecuenciaAire),
         cantidadPuntosParametros: clean(req.body.cantidadPuntosParametros), metodologiaParametros: clean(req.body.metodologiaParametros), fechaServicio,

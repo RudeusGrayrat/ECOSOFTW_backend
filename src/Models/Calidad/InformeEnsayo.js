@@ -3,7 +3,9 @@ const mongoose = require("mongoose");
 const versionSchema = new mongoose.Schema({
   numero: { type: Number, required: true },
   tipo: { type: String, enum: ["BORRADOR", "PRELIMINAR", "OFICIAL"], default: "BORRADOR" },
-  original: { path: String, filename: String, bytes: Number },
+  // filename es el nombre físico seguro; nombreOriginal conserva exactamente
+  // lo que el usuario cargó para la descarga documental.
+  original: { path: String, filename: String, nombreOriginal: String, bytes: Number },
   publicado: { path: String, filename: String, bytes: Number },
   // Permite regenerar informes oficiales creados antes de una mejora visual
   // del sello sin alterar su versión documental ni pedir una nueva carga.

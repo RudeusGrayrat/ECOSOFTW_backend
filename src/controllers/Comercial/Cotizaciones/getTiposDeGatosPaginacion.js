@@ -2,14 +2,17 @@ const Comercial_TiposDeGastos = require("../../../Models/Comercial/TipoDeGastos"
 const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getTiposDeGastosPaginacion = async (req, res) => {
-  const { limit = 10, page = 0, search = "" } = req.query;
+  const { limit = 10, page = 0, search = "", categoria, incluirInactivos = "false" } = req.query;
   try {
     const query = {};
+    if (categoria && ["OPERATIVO", "ADMINISTRATIVO", "SIN_CLASIFICAR"].includes(categoria)) query.categoria = categoria;
+    if (incluirInactivos !== "true") query.estado = "ACTIVO";
     if (search) {
       const safeSearch = escapeRegExp(search);
       const regex = new RegExp(safeSearch, "i");
       query.$or = [
         { tipoDeGasto: regex },
+        { codigo: regex },
         { descripcion: regex },
         { precio: regex },
         { estado: regex },

@@ -62,9 +62,10 @@ const money = (value) => `S/. ${Number(value || 0).toFixed(2)}`;
 const sum = (rows = []) => rows.reduce((total, row) => total + Number(row.monto ?? row.subtotal ?? 0), 0);
 const analyst = (row) => {
   const parameter = row.parametroSnapshot || row.parametro_id || {};
-  return { categoria: parameter.categoria || "", parametro: parameter.parametro || "", metodologia: parameter.metodo || "", acreditacion: parameter.acreditadoPor || "", unidad_de_medida: parameter.unidadDeMedida || "", ldm: parameter.limiteDeDeteccionDelMetodo || "", lcm: parameter.limiteDeCuantificacionDelMetodo || "", precio_unitario: money(parameter.precio), cantidad: row.cantidad || "", subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) };
+  return { categoria: parameter.categoria || "", parametro: parameter.parametro || "", nombre_corto: parameter.nombreCorto || parameter.parametro || "", tipo_item: parameter.tipoItem || "", unidad_cobro: parameter.unidadCobro || "POR_UNIDAD", metodologia: parameter.metodo || "", acreditacion: parameter.acreditadoPor || "", unidad_de_medida: parameter.unidadDeMedida || "", ldm: parameter.limiteDeDeteccionDelMetodo || "", lcm: parameter.limiteDeCuantificacionDelMetodo || "", precio_unitario: money(parameter.precio), cantidad: row.cantidad || "", subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) };
 };
-const gasto = (row, operational = false) => ({ descripcion: row.tipoDeGasto_id?.descripcion || row.descripcion || "", cantidad: row.cantidad || "", ...(operational ? { dias: row.dias || "" } : {}), precio: money(row.tipoDeGasto_id?.precio), subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) });
+const gasto = (row, operational = false) => { const source = row.gastoSnapshot || row.tipoDeGasto_id || {}; return { descripcion: source.descripcion || row.descripcion || "", codigo_gasto: source.codigo || "", cantidad: row.cantidad || "", ...(operational ? { dias: row.dias || "" } : {}), precio: money(source.precio ?? row.precio), subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) }; };
+const matrixSummaryLabel = (matriz) => matriz === "MONITOREO OCUPACIONAL" ? "MONITOREO OCUPACIONAL" : `MONITOREO AMBIENTAL DE ${matriz}`;
 const signaturePath = (user) => user?.firmaArchivo?.path || user?.firma || "";
 
 exports.cotizacion = async (req, res) => {
@@ -75,19 +76,39 @@ exports.cotizacion = async (req, res) => {
     if (!quote) return res.status(404).json({ message: "Cotización no encontrada", type: "Error" });
     pdfTrace(traceId, "quote.load.done", { quoteId: quote._id.toString(), code: quote.correlativaVisible, analyses: quote.analisis?.length || 0 });
     const client = quote.proyecto_id?.cliente_id || {};
-    const byType = (type) => (quote.analisis || []).filter((row) => row.parametro_id?.tipoDeAnalisis === type).map(analyst);
+    const project = quote.proyectoSnapshot?.nombre ? quote.proyectoSnapshot : (quote.proyecto_id || {});
+    const byType = (type) => (quote.analisis || []).filter((row) => (row.parametroSnapshot?.tipoDeAnalisis || row.parametro_id?.tipoDeAnalisis) === type).map(analyst);
     const agua = byType("AGUA"); const aire = byType("AIRE"); const suelo = byType("SUELO"); const ruido = byType("RUIDO"); const emisiones = byType("EMISIONES");
+    const analisisPorMatriz = (quote.analisis || []).reduce((groups, row) => {
+      const matriz = row.parametroSnapshot?.tipoDeAnalisis || row.parametro_id?.tipoDeAnalisis || "";
+      if (!matriz) return groups;
+      groups[matriz] = [...(groups[matriz] || []), row];
+      return groups;
+    }, {});
+    const matrices = Object.keys(analisisPorMatriz);
     const tiempo = { x1: "", x2: "", x3: "", x4: "", x5: "" };
     const timeKeys = { "INFORME DE ENSAYO": "x1", TRANSPORTE: "x2", "EQUIPOS DE CAMPO": "x3", "PERSONAL DE CAMPO": "x4", "INFORME DE MONITOREO": "x5" };
     (quote.tiempoDeEntrega || []).forEach((entry) => { if (timeKeys[entry]) tiempo[timeKeys[entry]] = "X"; });
     const gastosOperativos = (quote.gastosOperativos || []).map((row) => gasto(row, true));
     const gastosAdministrativos = (quote.gastosAdministrativos || []).map((row) => gasto(row));
-    const gastosGenerales = (quote.gastosGenerales || []).map((row) => ({ descripcion: row.descripcion || row.name || "", subtotal: money(row.subtotal) }));
+    // El bloque financiero empieza por los subtotales de cada matriz cotizada;
+    // luego añade conceptos manuales y gastos de operación/administración.
+    const resumenMatrices = matrices.map((matriz) => ({
+      descripcion: matrixSummaryLabel(matriz),
+      subtotal: money(sum(analisisPorMatriz[matriz])),
+      monto: sum(analisisPorMatriz[matriz]),
+    }));
+    const gastosGenerales = [
+      ...resumenMatrices,
+      ...(quote.gastosGenerales || []).filter((row) => Number(row.subtotal || 0) !== 0).map((row) => ({ descripcion: row.descripcion || row.name || "OTROS GASTOS", subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) })),
+      ...(sum(gastosOperativos) ? [{ descripcion: "GASTOS OPERATIVOS", subtotal: money(sum(gastosOperativos)), monto: sum(gastosOperativos) }] : []),
+      ...(sum(gastosAdministrativos) ? [{ descripcion: "GASTOS ADMINISTRATIVOS", subtotal: money(sum(gastosAdministrativos)), monto: sum(gastosAdministrativos) }] : []),
+    ];
     const asesor = quote.creadoPor || quote.actualizadoPor || {};
     const approvedSignature = quote.firmaAprobador || signaturePath(quote.aprobadoPor);
     return sendPdf(res, {
-      correlativa_doc: quote.correlativaVisible || "", codigo: quote.correlativaVisible || "", tipo_de_servicio: quote.tipoDeServicio || "", cliente: client.cliente || quote.facturacion?.razonSocial || "", nombre_proyecto: quote.proyecto_id?.nombre || "", numero_documento: client.numeroDocumento || quote.facturacion?.ruc || "", contacto: client.nombreContacto || "", telefono: client.telefono || "", correo: client.correoElectronico || "", fecha_emision: date(quote.createdAt), fecha_vigencia: date(new Date(new Date(quote.createdAt).getTime() + (30 * 24 * 60 * 60 * 1000))), direccion_legal: quote.facturacion?.direccion || client.direccionLegal || "", lugar_muestreo: quote.proyecto_id?.lugarMuestreo || "", forma_pago: quote.facturacion?.formaPago || "", razon_social: quote.facturacion?.razonSocial || client.cliente || "", ruc: quote.facturacion?.ruc || client.numeroDocumento || "",
-      ...tiempo, show_agua: agua.length > 0, agua, total_agua: money(sum(agua)), show_aire: aire.length > 0, aire, total_aire: money(sum(aire)), show_suelo: suelo.length > 0, suelo, total_suelo: money(sum(suelo)), show_ruido: ruido.length > 0, ruido, total_ruido: money(sum(ruido)), show_emisiones: emisiones.length > 0, emisiones, total_emisiones: money(sum(emisiones)), gastos_operativos: gastosOperativos, total_gastos_op: money(sum(gastosOperativos)), gastos_administrativos: gastosAdministrativos, total_gastos_ad: money(sum(gastosAdministrativos)), gastos_generales: gastosGenerales, total_gastos_generales: money(sum(gastosGenerales)), total_sin_igv: money(quote.totalSinIgv),
+      correlativa_doc: quote.correlativaVisible || "", codigo: quote.correlativaVisible || "", tipo_de_servicio: quote.tipoDeServicio || "", cliente: client.cliente || quote.facturacion?.razonSocial || "", nombre_proyecto: project.nombre || "según cadena de custodia", numero_documento: client.numeroDocumento || quote.facturacion?.ruc || "", contacto: client.nombreContacto || "", telefono: client.telefono || "", correo: client.correoElectronico || "", fecha_emision: date(quote.fechaElaboracion || quote.createdAt), fecha_vigencia: date(new Date(new Date(quote.fechaElaboracion || quote.createdAt).getTime() + (30 * 24 * 60 * 60 * 1000))), direccion_legal: quote.facturacion?.direccion || client.direccionLegal || "", lugar_muestreo: project.lugarMuestreo || "", forma_pago: quote.facturacion?.formaPago || "", razon_social: quote.facturacion?.razonSocial || client.cliente || "", ruc: quote.facturacion?.ruc || client.numeroDocumento || "", matriz: matrices.join(", "),
+      ...tiempo, show_agua: agua.length > 0, agua, total_agua: money(sum(agua)), show_aire: aire.length > 0, aire, total_aire: money(sum(aire)), show_suelo: suelo.length > 0, suelo, total_suelo: money(sum(suelo)), show_ruido: ruido.length > 0, ruido, total_ruido: money(sum(ruido)), show_emisiones: emisiones.length > 0, emisiones, total_emisiones: money(sum(emisiones)), gastos_operativos: gastosOperativos, total_gastos_op: money(sum(gastosOperativos)), gastos_administrativos: gastosAdministrativos, total_gastos_ad: money(sum(gastosAdministrativos)), gastos_generales: gastosGenerales, resumen_financiero: gastosGenerales, total_gastos_generales: money(sum(gastosGenerales)), subtotal: money(quote.totalSinIgv), total_sin_igv: money(quote.totalSinIgv), igv_18: money(quote.igv), igv: money(quote.igv), total_con_igv: money(quote.totalConIgv),
       colaboradorAsesor: asesor.colaborador || "", correoAsesor: asesor.correoElectronico || "", numeroAsesor: asesor.telefono || "", puestoAsesor: asesor.puesto || "", elaborador_por: asesor.colaborador || "", aprobador: quote.aprobadoPor?.colaborador || "", correoAprobador: quote.aprobadoPor?.correoElectronico || "", firmaAprobador: approvedSignature, firma_aprobador: approvedSignature, items: (quote.analisis || []).map(item), elaborado_por: asesor.colaborador || ""
     }, "COTIZACION", quote.correlativaVisible, traceId);
   } catch (error) { return pdfError(res, error, traceId, req.params.id, "COTIZACION"); }

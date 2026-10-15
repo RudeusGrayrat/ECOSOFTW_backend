@@ -1,6 +1,7 @@
 const Comercial_Cotizaciones = require("../../../Models/Comercial/Cotizaciones");
 const UserEcosoft = require("../../../Models/Herramientas/User");
 const Parametro = require("../../../Models/Comercial/Parametros");
+const TipoDeGasto = require("../../../Models/Comercial/TipoDeGastos");
 
 const withParameterSnapshots = async (analisis = []) => {
     const ids = [...new Set(analisis.map((item) => item.parametro_id?._id?.toString() || item.parametro_id?.toString()).filter(Boolean))];
@@ -10,7 +11,19 @@ const withParameterSnapshots = async (analisis = []) => {
     return analisis.map((analysis) => {
         const id = analysis.parametro_id?._id?.toString() || analysis.parametro_id?.toString();
         const parameter = parameterMap.get(id);
-        return { ...analysis, parametro_id: id, parametroSnapshot: { tipoDeAnalisis: parameter.tipoDeAnalisis, categoria: parameter.categoria, parametro: parameter.parametro, metodo: parameter.metodo, acreditadoPor: parameter.acreditadoPor, tipoDeAcreditacion: parameter.tipoDeAcreditacion, limiteDeCuantificacionDelMetodo: parameter.limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo: parameter.limiteDeDeteccionDelMetodo, unidadDeMedida: parameter.unidadDeMedida, precio: parameter.precio } };
+        return { ...analysis, parametro_id: id, parametroSnapshot: { tipoDeAnalisis: parameter.tipoDeAnalisis, categoria: parameter.categoria, nombreCorto: parameter.nombreCorto, parametro: parameter.parametro, componentes: parameter.componentes, tipoItem: parameter.tipoItem, unidadCobro: parameter.unidadCobro, metodo: parameter.metodo, acreditadoPor: parameter.acreditadoPor, tipoDeAcreditacion: parameter.tipoDeAcreditacion, limiteDeCuantificacionDelMetodo: parameter.limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo: parameter.limiteDeDeteccionDelMetodo, unidadDeMedida: parameter.unidadDeMedida, precio: parameter.precio, vigenciaDesde: parameter.vigenciaDesde, vigenciaHasta: parameter.vigenciaHasta } };
+    });
+};
+const withExpenseSnapshots = async (gastos = [], categoria) => {
+    const ids = [...new Set(gastos.map((item) => item.tipoDeGasto_id?._id?.toString() || item.tipoDeGasto_id?.toString()).filter(Boolean))];
+    const tipos = await TipoDeGasto.find({ _id: { $in: ids }, categoria, estado: "ACTIVO" }).lean();
+    const byId = new Map(tipos.map((tipo) => [tipo._id.toString(), tipo]));
+    if (byId.size !== ids.length) throw new Error("Uno o más gastos no pertenecen a la categoría seleccionada o están inactivos");
+    return gastos.map((gasto) => {
+        const id = gasto.tipoDeGasto_id?._id?.toString() || gasto.tipoDeGasto_id?.toString();
+        const tipo = byId.get(id);
+        if (!tipo) return gasto;
+        return { ...gasto, tipoDeGasto_id: id, gastoSnapshot: { codigo: tipo.codigo || "", tipoDeGasto: tipo.tipoDeGasto, categoria: tipo.categoria, descripcion: tipo.descripcion, precio: tipo.precio, origen: tipo.origen || "MANUAL", unidadReferencia: tipo.unidadReferencia || "FIJO", vigenciaDesde: tipo.vigenciaDesde, vigenciaHasta: tipo.vigenciaHasta } };
     });
 };
 
@@ -44,8 +57,8 @@ const patchCotizacion = async (req, res) => {
         if (tipoDeServicio) findCotizacion.tipoDeServicio = tipoDeServicio;
         if (tiempoDeEntrega) findCotizacion.tiempoDeEntrega = tiempoDeEntrega;
         if (analisis) findCotizacion.analisis = await withParameterSnapshots(analisis);
-        if (gastosOperativos) findCotizacion.gastosOperativos = gastosOperativos;
-        if (gastosAdministrativos) findCotizacion.gastosAdministrativos = gastosAdministrativos;
+        if (gastosOperativos) findCotizacion.gastosOperativos = await withExpenseSnapshots(gastosOperativos, "OPERATIVO");
+        if (gastosAdministrativos) findCotizacion.gastosAdministrativos = await withExpenseSnapshots(gastosAdministrativos, "ADMINISTRATIVO");
         if (gastosGenerales) findCotizacion.gastosGenerales = gastosGenerales;
         if (totalSinIgv) findCotizacion.totalSinIgv = totalSinIgv;
         if (totalConIgv) findCotizacion.totalConIgv = totalConIgv;

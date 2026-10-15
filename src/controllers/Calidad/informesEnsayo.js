@@ -194,7 +194,7 @@ const safeFilenameBase = (value) => path.basename(value || "", path.extname(valu
 
 const filenameFor = (codigo, version, type, originalName = "") => {
   const originalBase = safeFilenameBase(originalName || codigo);
-  if (type === "oficial") return `IE_${safeSegment(codigo)}.pdf`;
+  if (type === "oficial") return officialFilenameFor(codigo, originalName);
   if (type === "preliminar") return `PRELIMINAR_${safeSegment(codigo)}.pdf`;
   if (type === "borrador") return `${originalBase || safeSegment(codigo)}_borrador.pdf`;
   return type === "publicado"
@@ -215,11 +215,13 @@ const cleanOriginalVisibleName = (filename = "") => {
   return `${baseName}${extension}`;
 };
 
+const originalVisibleName = (version) => cleanOriginalVisibleName(version?.original?.nombreOriginal || version?.original?.filename || "");
+
 const visibleProcessedName = (report, version) => {
   const tipo = normalize(version?.tipo || report.tipoVersion);
-  if (tipo === "OFICIAL") return `IE_${safeSegment(report.codigo)}.pdf`;
+  if (tipo === "OFICIAL") return officialFilenameFor(report.codigo, version?.original?.nombreOriginal || version?.original?.filename);
   if (tipo === "PRELIMINAR") return `PRELIMINAR_${safeSegment(report.codigo)}.pdf`;
-  if (!version?.tipo && (report.estado === "LIBERADO" || report.estado === "DISPONIBLE")) return `IE_${safeSegment(report.codigo)}.pdf`;
+  if (!version?.tipo && (report.estado === "LIBERADO" || report.estado === "DISPONIBLE")) return officialFilenameFor(report.codigo, version?.original?.nombreOriginal || version?.original?.filename);
   if (!version?.tipo && report.estado === "PRELIMINAR") return `PRELIMINAR_${safeSegment(report.codigo)}.pdf`;
   return "";
 };
@@ -231,7 +233,13 @@ const normalizeVersionType = (report, version) => {
   return "BORRADOR";
 };
 
-const officialFilenameFor = (codigo) => `IE_${safeSegment(codigo)}.pdf`;
+const officialFilenameFor = (codigo, originalName = "") => {
+  const visible = cleanOriginalVisibleName(originalName);
+  const originalBase = path.basename(visible, path.extname(visible))
+    .replace(/^IE[ _-]+/i, "")
+    .trim();
+  return `IE_${safeFilenameBase(originalBase || codigo)}.pdf`;
+};
 
 const requiresOfficialReprocess = (report, version) => {
   const estado = normalize(report?.estado);
@@ -239,7 +247,7 @@ const requiresOfficialReprocess = (report, version) => {
   if (!version?.publicado?.path) return true;
   if (normalize(version?.tipo) !== "OFICIAL") return true;
   if (Number(version?.selloLayoutVersion || 0) < officialSealLayoutVersion) return true;
-  return version?.publicado?.filename !== officialFilenameFor(report.codigo);
+  return version?.publicado?.filename !== officialFilenameFor(report.codigo, version?.original?.nombreOriginal || version?.original?.filename);
 };
 
 async function saveFile(codigo, version, filename, buffer) {
@@ -939,7 +947,7 @@ exports.listar = async (req, res) => {
             .map((version) => ({
               ...version,
               tipo: normalizeVersionType({ ...item, estado: estadoNormalizado }, version),
-              originalVisible: cleanOriginalVisibleName(version.original?.filename || ""),
+              originalVisible: originalVisibleName(version),
               procesadoVisible: visibleProcessedName({ ...item, estado: estadoNormalizado }, version),
             }))
             .filter((version) => version.tipo !== "BORRADOR" || estadoNormalizado === "BORRADOR");
@@ -952,7 +960,7 @@ exports.listar = async (req, res) => {
             tipoVersion: versionActual?.tipo || item.tipoVersion || (estadoNormalizado === "LIBERADO" ? "OFICIAL" : estadoNormalizado),
             vistoBuenoJefatura: Boolean(item.vistoBuenoJefatura || estadoNormalizado === "LIBERADO" || estadoNormalizado === "PRELIMINAR"),
             estado: estadoNormalizado,
-            archivoOriginal: cleanOriginalVisibleName(originalFilename),
+            archivoOriginal: originalVisibleName(versionActual) || cleanOriginalVisibleName(originalFilename),
             archivoGenerado: visibleProcessedName({ ...item, estado: estadoNormalizado }, versionActual) || versionActual?.publicado?.filename || "",
             versionesVisibles,
             requiereReprocesarOficial: requiresOfficialReprocess({ ...item, estado: estadoNormalizado }, versionActual),
@@ -1120,7 +1128,7 @@ async function guardarBorrador(req, file, body, metadata = {}) {
   report.versiones.push({
     numero: nextVersion,
     tipo: "BORRADOR",
-    original: { path: originalPath, filename: originalFilename, bytes: file.size },
+    original: { path: originalPath, filename: originalFilename, nombreOriginal: file.originalname, bytes: file.size },
     publicado: { path: processedPath, filename: processedFilename, bytes: file.size },
     procesadoPor: actor(req),
   });
@@ -1278,7 +1286,7 @@ async function regenerarVersion(report, req, tipoVersion, tipoMarcaAgua, include
   if (!version?.original?.path) throw new Error("El informe no tiene archivo original para procesar");
   const source = await fs.readFile(assertInsideStorage(version.original.path));
   const processedBuffer = await protectPdfIfAvailable(await processPdf(source, report, { tipoMarcaAgua, includeFirma, includeAccessSeal }));
-  const filename = filenameFor(report.codigo, report.versionActual, tipoVersion === "OFICIAL" ? "oficial" : "preliminar", version.original.filename);
+  const filename = filenameFor(report.codigo, report.versionActual, tipoVersion === "OFICIAL" ? "oficial" : "preliminar", version.original.nombreOriginal || version.original.filename);
   const processedPath = await saveFile(report.codigo, report.versionActual, filename, processedBuffer);
   version.tipo = tipoVersion;
   if (tipoVersion === "OFICIAL") version.selloLayoutVersion = officialSealLayoutVersion;
@@ -1622,7 +1630,8 @@ exports.archivoAdmin = async (req, res) => {
     const version = report.versiones.find((item) => item.numero === report.versionActual);
     const filePath = assertInsideStorage(version?.publicado?.path || "");
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `${req.query.download === "true" ? "attachment" : "inline"}; filename="${version.publicado.filename}"`);
+    const visibleFilename = visibleProcessedName(report, version) || version.publicado.filename;
+    res.setHeader("Content-Disposition", `${req.query.download === "true" ? "attachment" : "inline"}; filename="${visibleFilename}"`);
     res.sendFile(filePath);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1640,7 +1649,7 @@ async function appendReportToArchive(archive, report, options = {}) {
     await fs.access(filePath);
     archive.file(filePath, {
       name: options.officialOnly
-        ? visibleProcessedName(report, version) || `IE_${safeSegment(report.codigo)}.pdf`
+        ? visibleProcessedName(report, version) || officialFilenameFor(report.codigo, version?.original?.nombreOriginal || version?.original?.filename)
         : version.publicado.filename || `${safeSegment(report.codigo)}.pdf`,
     });
     return "";
@@ -1791,7 +1800,8 @@ exports.archivoPublico = async (req, res) => {
     const version = report.versiones.find((item) => item.numero === report.versionActual);
     const filePath = assertInsideStorage(version?.publicado?.path || "");
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `${req.query.download === "true" ? "attachment" : "inline"}; filename="${version.publicado.filename}"`);
+    const visibleFilename = visibleProcessedName(report, version) || version.publicado.filename;
+    res.setHeader("Content-Disposition", `${req.query.download === "true" ? "attachment" : "inline"}; filename="${visibleFilename}"`);
     res.sendFile(filePath);
   } catch (error) {
     res.status(500).json({ message: error.message });
