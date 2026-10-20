@@ -18,7 +18,8 @@ exports.crearPlan = async (req, res) => {
     const last = await Plan.findOne({ codigo: new RegExp(`-${suffix}$`) }).sort({ correlativo: -1 }).lean();
     const correlativo = (last?.correlativo || 0) + 1;
     const client = quote.proyecto_id?.cliente_id || {};
-    const plan = await Plan.create({ cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio: request?.fechaServicio || quote.proyecto_id?.fechaServicio }, condicionesIngreso: request?.condicionesIngreso, trabajoAltoRiesgo: request?.trabajoAltoRiesgo, accesibilidadPuntos: request?.accesibilidadPuntos, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), creadoPor: req.body.creadoPor });
+    const fechaServicio = request?.fechaServicio || quote.proyecto_id?.fechaServicio;
+    const plan = await Plan.create({ cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio }, programacion: fechaServicio ? { fechaInicio: fechaServicio, fechaFin: fechaServicio, estadoOperacion: "PROGRAMADO" } : {}, condicionesIngreso: request?.condicionesIngreso, trabajoAltoRiesgo: request?.trabajoAltoRiesgo, accesibilidadPuntos: request?.accesibilidadPuntos, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), creadoPor: req.body.creadoPor });
     return res.status(201).json({ message: "Plan de Trabajo creado", type: "Correcto", data: plan });
   } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
 };
@@ -74,10 +75,24 @@ exports.listarOrdenes = async (req, res) => {
 };
 
 exports.actualizarPlan = async (req, res) => {
-  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "estaciones", "items", "analistaOperaciones", "analistaOperacionesManual", "elaboradoPor", "estado"];
+  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "estaciones", "items", "analistaOperaciones", "analistaOperacionesManual", "elaboradoPor", "estado", "programacion"];
   const changes = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
-  const data = await Plan.findByIdAndUpdate(req.params.id, changes, { new: true });
-  return data ? res.json({ data, message: "Plan de Trabajo actualizado", type: "Correcto" }) : res.status(404).json({ message: "Plan no encontrado", type: "Error" });
+  const plan = await Plan.findById(req.params.id);
+  if (!plan) return res.status(404).json({ message: "Plan no encontrado", type: "Error" });
+  if (changes.programacion) {
+    const before = plan.programacion?.toObject?.() || plan.programacion || {};
+    const next = { ...before, ...changes.programacion };
+    if (next.fechaInicio && !next.fechaFin) next.fechaFin = next.fechaInicio;
+    if (next.fechaFin && next.fechaInicio && new Date(next.fechaFin) < new Date(next.fechaInicio)) return res.status(400).json({ message: "La fecha final no puede ser anterior a la fecha inicial", type: "Advertencia" });
+    changes.programacion = next;
+    if (next.fechaInicio) {
+      changes.proyecto = { ...(plan.proyecto?.toObject?.() || plan.proyecto || {}), fechaServicio: next.fechaInicio };
+    }
+    plan.historialProgramacion.push({ actualizadoPor: req.body.actualizadoPor, motivo: req.body.motivoReprogramacion || "Actualización de programación", antes: before, despues: next });
+  }
+  Object.assign(plan, changes);
+  const data = await plan.save();
+  return res.json({ data, message: "Plan de Trabajo actualizado", type: "Correcto" });
 };
 
 exports.actualizarOrden = async (req, res) => {

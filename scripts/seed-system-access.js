@@ -30,6 +30,18 @@ const modules = [
       { name: "CONFIGURACION", slug: "configuracion", order: 2 },
     ],
   },
+  {
+    name: "OPERACIONES",
+    slug: "operaciones",
+    icon: "OPERACIONES.svg",
+    order: 3,
+    submodules: [
+      { name: "PLANES DE TRABAJO", slug: "planes de trabajo", order: 1 },
+      { name: "ORDENES INTERNAS", slug: "ordenes internas", order: 2 },
+      { name: "CRONOGRAMA OPERATIVO", slug: "cronograma operativo", order: 3 },
+      { name: "RECURSOS OPERATIVOS", slug: "recursos operativos", order: 4 },
+    ],
+  },
 ];
 
 const normalize = (value) => value.toString().trim().toUpperCase();
