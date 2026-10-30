@@ -3,6 +3,14 @@ const UserEcosoft = require("../../../Models/Herramientas/User");
 const Parametro = require("../../../Models/Comercial/Parametros");
 const TipoDeGasto = require("../../../Models/Comercial/TipoDeGastos");
 
+const round2 = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const refreshTotals = (cotizacion) => {
+    const totalSinIgv = round2([...(cotizacion.analisis || []), ...(cotizacion.gastosOperativos || []), ...(cotizacion.gastosAdministrativos || [])].reduce((total, item) => total + Number(item.subtotal || 0), 0));
+    cotizacion.totalSinIgv = totalSinIgv;
+    cotizacion.igv = round2(totalSinIgv * 0.18);
+    cotizacion.totalConIgv = round2(totalSinIgv + cotizacion.igv);
+};
+
 const withParameterSnapshots = async (analisis = []) => {
     const ids = [...new Set(analisis.map((item) => item.parametro_id?._id?.toString() || item.parametro_id?.toString()).filter(Boolean))];
     const parameters = await Parametro.find({ _id: { $in: ids }, estado: { $ne: "INACTIVO" } }).lean();
@@ -11,11 +19,15 @@ const withParameterSnapshots = async (analisis = []) => {
     return analisis.map((analysis) => {
         const id = analysis.parametro_id?._id?.toString() || analysis.parametro_id?.toString();
         const parameter = parameterMap.get(id);
-        return { ...analysis, parametro_id: id, parametroSnapshot: { tipoDeAnalisis: parameter.tipoDeAnalisis, categoria: parameter.categoria, nombreCorto: parameter.nombreCorto, parametro: parameter.parametro, componentes: parameter.componentes, tipoItem: parameter.tipoItem, unidadCobro: parameter.unidadCobro, metodo: parameter.metodo, acreditadoPor: parameter.acreditadoPor, tipoDeAcreditacion: parameter.tipoDeAcreditacion, limiteDeCuantificacionDelMetodo: parameter.limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo: parameter.limiteDeDeteccionDelMetodo, unidadDeMedida: parameter.unidadDeMedida, precio: parameter.precio, vigenciaDesde: parameter.vigenciaDesde, vigenciaHasta: parameter.vigenciaHasta } };
+        const cantidad = Number(analysis.cantidad || 0);
+        const precioUnitario = Number.isFinite(Number(analysis.precio ?? analysis.precioUnitario)) ? Number(analysis.precio ?? analysis.precioUnitario) : Number(parameter.precio || 0);
+        return { ...analysis, parametro_id: id, cantidad, precioUnitario, subtotal: round2(precioUnitario * cantidad), parametroSnapshot: { tipoDeAnalisis: parameter.tipoDeAnalisis, categoria: parameter.categoria, nombreCorto: parameter.nombreCorto, parametro: parameter.parametro, componentes: parameter.componentes, tipoItem: parameter.tipoItem, unidadCobro: parameter.unidadCobro, metodo: parameter.metodo, acreditadoPor: parameter.acreditadoPor, tipoDeAcreditacion: parameter.tipoDeAcreditacion, limiteDeCuantificacionDelMetodo: parameter.limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo: parameter.limiteDeDeteccionDelMetodo, unidadDeMedida: parameter.unidadDeMedida, precio: parameter.precio, vigenciaDesde: parameter.vigenciaDesde, vigenciaHasta: parameter.vigenciaHasta } };
     });
 };
 const withExpenseSnapshots = async (gastos = [], categoria) => {
-    const ids = [...new Set(gastos.map((item) => item.tipoDeGasto_id?._id?.toString() || item.tipoDeGasto_id?.toString()).filter(Boolean))];
+    const rawIds = gastos.map((item) => item.tipoDeGasto_id?._id?.toString() || item.tipoDeGasto_id?.toString());
+    if (rawIds.some((id) => !id)) throw new Error("Cada gasto debe seleccionar un tipo de gasto válido");
+    const ids = [...new Set(rawIds)];
     const tipos = await TipoDeGasto.find({ _id: { $in: ids }, categoria, estado: "ACTIVO" }).lean();
     const byId = new Map(tipos.map((tipo) => [tipo._id.toString(), tipo]));
     if (byId.size !== ids.length) throw new Error("Uno o más gastos no pertenecen a la categoría seleccionada o están inactivos");
@@ -23,7 +35,10 @@ const withExpenseSnapshots = async (gastos = [], categoria) => {
         const id = gasto.tipoDeGasto_id?._id?.toString() || gasto.tipoDeGasto_id?.toString();
         const tipo = byId.get(id);
         if (!tipo) return gasto;
-        return { ...gasto, tipoDeGasto_id: id, gastoSnapshot: { codigo: tipo.codigo || "", tipoDeGasto: tipo.tipoDeGasto, categoria: tipo.categoria, descripcion: tipo.descripcion, precio: tipo.precio, origen: tipo.origen || "MANUAL", unidadReferencia: tipo.unidadReferencia || "FIJO", vigenciaDesde: tipo.vigenciaDesde, vigenciaHasta: tipo.vigenciaHasta } };
+        const cantidad = Number(gasto.cantidad || 0);
+        const dias = categoria === "OPERATIVO" ? Number(gasto.dias || 0) : undefined;
+        const precioUnitario = Number.isFinite(Number(gasto.precio ?? gasto.precioUnitario)) ? Number(gasto.precio ?? gasto.precioUnitario) : Number(tipo.precio || 0);
+        return { ...gasto, tipoDeGasto_id: id, cantidad, ...(categoria === "OPERATIVO" ? { dias } : {}), precioUnitario, subtotal: round2(precioUnitario * cantidad * (categoria === "OPERATIVO" ? dias : 1)), gastoSnapshot: { codigo: tipo.codigo || "", tipoDeGasto: tipo.tipoDeGasto, categoria: tipo.categoria, descripcion: tipo.descripcion, precio: tipo.precio, origen: tipo.origen || "MANUAL", unidadReferencia: tipo.unidadReferencia || "FIJO", vigenciaDesde: tipo.vigenciaDesde, vigenciaHasta: tipo.vigenciaHasta } };
     });
 };
 
@@ -37,10 +52,6 @@ const patchCotizacion = async (req, res) => {
         analisis,
         gastosOperativos,
         gastosAdministrativos,
-        gastosGenerales,
-        totalSinIgv,
-        totalConIgv,
-        igv,
         estado,
         facturacion,
         actualizadoPor,
@@ -59,10 +70,7 @@ const patchCotizacion = async (req, res) => {
         if (analisis) findCotizacion.analisis = await withParameterSnapshots(analisis);
         if (gastosOperativos) findCotizacion.gastosOperativos = await withExpenseSnapshots(gastosOperativos, "OPERATIVO");
         if (gastosAdministrativos) findCotizacion.gastosAdministrativos = await withExpenseSnapshots(gastosAdministrativos, "ADMINISTRATIVO");
-        if (gastosGenerales) findCotizacion.gastosGenerales = gastosGenerales;
-        if (totalSinIgv) findCotizacion.totalSinIgv = totalSinIgv;
-        if (totalConIgv) findCotizacion.totalConIgv = totalConIgv;
-        if (igv) findCotizacion.igv = igv;
+        if (analisis || gastosOperativos || gastosAdministrativos) refreshTotals(findCotizacion);
         if (estado) findCotizacion.estado = estado;
         if (facturacion) findCotizacion.facturacion = facturacion;
         if (actualizadoPor) findCotizacion.actualizadoPor = actualizadoPor;

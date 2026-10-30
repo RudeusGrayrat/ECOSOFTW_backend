@@ -48,6 +48,7 @@ const comercial_cotizacionesSchema = mongoose.Schema(
           ref: "comercial_parametros",
         },
         cantidad: { type: Number },
+        precioUnitario: { type: Number },
         subtotal: { type: Number },
         gastoSnapshot: {
           codigo: String,
@@ -92,6 +93,7 @@ const comercial_cotizacionesSchema = mongoose.Schema(
         },
         cantidad: { type: Number },
         dias: { type: Number },
+        precioUnitario: { type: Number },
         subtotal: { type: Number },
         gastoSnapshot: {
           codigo: String,
@@ -113,9 +115,25 @@ const comercial_cotizacionesSchema = mongoose.Schema(
           ref: "comercial_tipos_de_gastos",
         },
         cantidad: { type: Number },
+        precioUnitario: { type: Number },
         subtotal: { type: Number },
+        // El gasto administrativo también debe conservar el catálogo usado
+        // en la cotización, igual que el operativo.
+        gastoSnapshot: {
+          codigo: String,
+          tipoDeGasto: String,
+          categoria: String,
+          descripcion: String,
+          precio: Number,
+          origen: String,
+          unidadReferencia: String,
+          vigenciaDesde: Date,
+          vigenciaHasta: Date,
+        },
       },
     ],
+    // Legado: se conserva para poder leer cotizaciones antiguas, pero las
+    // nuevas no deben guardar aquí un resumen financiero derivado.
     gastosGenerales: [
       {
         descripcion: {

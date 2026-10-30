@@ -2,6 +2,20 @@ const Cotizacion = require("../../../Models/Comercial/Cotizaciones");
 const AuditLog = require("../../../Models/Herramientas/AuditLog");
 
 const normalize = (value) => (value || "").toString().trim().toUpperCase();
+const round2 = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const totalsFromRows = (analisis = [], operativos = [], administrativos = []) => {
+  const totalSinIgv = round2([...analisis, ...operativos, ...administrativos].reduce((total, item) => total + Number(item.subtotal || 0), 0));
+  const igv = round2(totalSinIgv * 0.18);
+  return { totalSinIgv, igv, totalConIgv: round2(totalSinIgv + igv) };
+};
+const normalizeRows = (rows = [], operational = false) => rows.map((row) => {
+  const cantidad = Number(row.cantidad || 0);
+  const dias = operational ? Number(row.dias || 0) : undefined;
+  const precioUnitario = Number.isFinite(Number(row.precio ?? row.precioUnitario))
+    ? Number(row.precio ?? row.precioUnitario)
+    : Number(row.parametroSnapshot?.precio ?? row.gastoSnapshot?.precio ?? row.tipoDeGasto_id?.precio ?? 0);
+  return { ...row, cantidad, ...(operational ? { dias } : {}), precioUnitario, subtotal: round2(precioUnitario * cantidad * (operational ? dias : 1)) };
+});
 const nextCode = (code, version) => {
   const label = `VR${String(version).padStart(2, "0")}`;
   return /VR\d{2}/.test(code) ? code.replace(/VR\d{2}/, label) : `${code}-${label}`;
@@ -14,8 +28,7 @@ const hasQuotationEditPermission = (user) => (user?.modules || []).some((entry) 
 const allowedFields = [
   "proyecto_id", "solicitud_id", "proyectoSnapshot", "solicitudSnapshot",
   "tipoDeServicio", "tiempoDeEntrega", "analisis", "gastosOperativos",
-  "gastosAdministrativos", "gastosGenerales", "totalSinIgv", "totalConIgv",
-  "igv", "facturacion", "fechaElaboracion"
+  "gastosAdministrativos", "facturacion", "fechaElaboracion"
 ];
 
 const postNuevaVersionCotizacion = async (req, res) => {
@@ -54,9 +67,18 @@ const postNuevaVersionCotizacion = async (req, res) => {
     });
 
     const { _id, createdAt, updatedAt, __v, estado, aprobadoPor, firmaAprobador, actualizadoPor, ...base } = original;
+    const analisis = normalizeRows(overrides.analisis ?? base.analisis);
+    const gastosOperativos = normalizeRows(overrides.gastosOperativos ?? base.gastosOperativos, true);
+    const gastosAdministrativos = normalizeRows(overrides.gastosAdministrativos ?? base.gastosAdministrativos);
+    const totals = totalsFromRows(analisis, gastosOperativos, gastosAdministrativos);
     const nueva = await Cotizacion.create({
       ...base,
       ...overrides,
+      analisis,
+      gastosOperativos,
+      gastosAdministrativos,
+      gastosGenerales: [],
+      ...totals,
       version,
       correlativaVisible,
       codigoPersonalizado: requestedManualCode || original.codigoPersonalizado || undefined,

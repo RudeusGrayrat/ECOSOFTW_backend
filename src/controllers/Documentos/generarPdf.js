@@ -62,9 +62,10 @@ const money = (value) => `S/. ${Number(value || 0).toFixed(2)}`;
 const sum = (rows = []) => rows.reduce((total, row) => total + Number(row.monto ?? row.subtotal ?? 0), 0);
 const analyst = (row) => {
   const parameter = row.parametroSnapshot || row.parametro_id || {};
-  return { categoria: parameter.categoria || "", parametro: parameter.parametro || "", nombre_corto: parameter.nombreCorto || parameter.parametro || "", tipo_item: parameter.tipoItem || "", unidad_cobro: parameter.unidadCobro || "POR_UNIDAD", metodologia: parameter.metodo || "", acreditacion: parameter.acreditadoPor || "", unidad_de_medida: parameter.unidadDeMedida || "", ldm: parameter.limiteDeDeteccionDelMetodo || "", lcm: parameter.limiteDeCuantificacionDelMetodo || "", precio_unitario: money(parameter.precio), cantidad: row.cantidad || "", subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) };
+  const precioUnitario = row.precioUnitario ?? row.precio ?? parameter.precio;
+  return { categoria: parameter.categoria || "", parametro: parameter.parametro || "", nombre_corto: parameter.nombreCorto || parameter.parametro || "", tipo_item: parameter.tipoItem || "", unidad_cobro: parameter.unidadCobro || "POR_UNIDAD", metodologia: parameter.metodo || "", acreditacion: parameter.acreditadoPor || "", unidad_de_medida: parameter.unidadDeMedida || "", ldm: parameter.limiteDeDeteccionDelMetodo || "", lcm: parameter.limiteDeCuantificacionDelMetodo || "", precio_unitario: money(precioUnitario), cantidad: row.cantidad || "", subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) };
 };
-const gasto = (row, operational = false) => { const source = row.gastoSnapshot || row.tipoDeGasto_id || {}; return { descripcion: source.descripcion || row.descripcion || "", codigo_gasto: source.codigo || "", cantidad: row.cantidad || "", ...(operational ? { dias: row.dias || "" } : {}), precio: money(source.precio ?? row.precio), subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) }; };
+const gasto = (row, operational = false) => { const source = row.gastoSnapshot || row.tipoDeGasto_id || {}; return { descripcion: source.descripcion || row.descripcion || "", codigo_gasto: source.codigo || "", cantidad: row.cantidad || "", ...(operational ? { dias: row.dias || "" } : {}), precio: money(row.precioUnitario ?? row.precio ?? source.precio), subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) }; };
 const matrixSummaryLabel = (matriz) => matriz === "MONITOREO OCUPACIONAL" ? "MONITOREO OCUPACIONAL" : `MONITOREO AMBIENTAL DE ${matriz}`;
 const signaturePath = (user) => user?.firmaArchivo?.path || user?.firma || "";
 
@@ -91,8 +92,9 @@ exports.cotizacion = async (req, res) => {
     (quote.tiempoDeEntrega || []).forEach((entry) => { if (timeKeys[entry]) tiempo[timeKeys[entry]] = "X"; });
     const gastosOperativos = (quote.gastosOperativos || []).map((row) => gasto(row, true));
     const gastosAdministrativos = (quote.gastosAdministrativos || []).map((row) => gasto(row));
-    // El bloque financiero empieza por los subtotales de cada matriz cotizada;
-    // luego añade conceptos manuales y gastos de operación/administración.
+    // Fuente única del bloque financiero: líneas cotizadas y sus gastos.
+    // Los gastosGenerales históricos eran un resumen derivado y no se vuelven
+    // a mezclar aquí, porque duplicaban matrices y gastos en el PDF.
     const resumenMatrices = matrices.map((matriz) => ({
       descripcion: matrixSummaryLabel(matriz),
       subtotal: money(sum(analisisPorMatriz[matriz])),
@@ -100,7 +102,6 @@ exports.cotizacion = async (req, res) => {
     }));
     const gastosGenerales = [
       ...resumenMatrices,
-      ...(quote.gastosGenerales || []).filter((row) => Number(row.subtotal || 0) !== 0).map((row) => ({ descripcion: row.descripcion || row.name || "OTROS GASTOS", subtotal: money(row.subtotal), monto: Number(row.subtotal || 0) })),
       ...(sum(gastosOperativos) ? [{ descripcion: "GASTOS OPERATIVOS", subtotal: money(sum(gastosOperativos)), monto: sum(gastosOperativos) }] : []),
       ...(sum(gastosAdministrativos) ? [{ descripcion: "GASTOS ADMINISTRATIVOS", subtotal: money(sum(gastosAdministrativos)), monto: sum(gastosAdministrativos) }] : []),
     ];

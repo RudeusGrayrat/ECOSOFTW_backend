@@ -1,5 +1,7 @@
 const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
 
+const upper = (value) => typeof value === "string" ? value.trim().toUpperCase() : value;
+
 const patchProyecto = async (req, res) => {
     const { id } = req.params;
     const {
@@ -19,8 +21,8 @@ const patchProyecto = async (req, res) => {
         if (!findProyecto) {
             return res.status(404).json({ message: "Proyecto no encontrado" });
         }
-        if (nombre) findProyecto.nombre = nombre;
-        if (servicio) findProyecto.servicio = servicio;
+        if (nombre) findProyecto.nombre = upper(nombre);
+        if (servicio) findProyecto.servicio = upper(servicio);
         if (cliente_id) findProyecto.cliente_id = cliente_id;
         if (fechaServicio) findProyecto.fechaServicio = fechaServicio;
         if (cantidadPuntosParametros !== undefined) findProyecto.cantidadPuntosParametros = typeof cantidadPuntosParametros === "string" ? cantidadPuntosParametros.trim() : cantidadPuntosParametros;

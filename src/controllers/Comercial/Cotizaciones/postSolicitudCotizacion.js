@@ -4,6 +4,7 @@ const SolicitudCotizacion = require("../../../Models/Comercial/SolicitudesCotiza
 const { saveIncoming, removeSaved } = require("./solicitudAdjuntos");
 
 const clean = (value) => (typeof value === "string" ? value.trim() : value);
+const upper = (value) => typeof value === "string" ? value.trim().toUpperCase() : value;
 const parseJson = (value, fallback) => {
   if (value === undefined || value === null || value === "") return fallback;
   if (typeof value !== "string") return value;
@@ -19,7 +20,7 @@ const postSolicitudCotizacion = async (req, res) => {
   const servicios = cleanList(req.body.servicios);
   const contacto = parseJson(req.body.contacto, {});
   // El proyecto es opcional para solicitudes que llegan desde cadena de custodia.
-  const nombreProyecto = clean(proyecto) || "según cadena de custodia";
+  const nombreProyecto = upper(proyecto) || "según cadena de custodia";
 
   if (!cliente || !numeroDocumento || !servicios.length || !fechaServicio) {
     return res.status(400).json({ message: "Completa los datos obligatorios de identificación, servicio y fecha.", type: "Advertencia" });
@@ -29,7 +30,7 @@ const postSolicitudCotizacion = async (req, res) => {
     let clienteDb = await ComercialClientes.findOne({ numeroDocumento: clean(numeroDocumento) });
     if (!clienteDb) {
       clienteDb = await ComercialClientes.create({
-        tipoCliente, cliente: clean(cliente), numeroDocumento: clean(numeroDocumento), nombreContacto: clean(contacto.nombreCompleto),
+        tipoCliente, cliente: upper(cliente), numeroDocumento: upper(numeroDocumento), nombreContacto: upper(contacto.nombreCompleto),
         telefono: clean(contacto.telefono), correoElectronico: clean(contacto.correo), direccionLegal: clean(direccionLegal), estado: "ACTIVO",
       });
     }
@@ -55,10 +56,15 @@ const postSolicitudCotizacion = async (req, res) => {
         tipoDocumento: cleanList(req.body.tipoDocumento), nombrePlanta: clean(req.body.nombrePlanta), lugarEjecucion: clean(req.body.lugarEjecucion),
         ubicacion: parseJson(req.body.ubicacion, {}), parametrosSolicitados: cleanParameterRequests(req.body.parametrosSolicitados),
         requisitosIngreso: cleanList(req.body.requisitosIngreso), induccionHoras: req.body.induccionHoras === "" || req.body.induccionHoras === undefined ? undefined : Number(req.body.induccionHoras),
-        peligrosEspecificos: cleanList(req.body.peligrosEspecificos), zonaUtm: clean(req.body.zonaUtm), datum: clean(req.body.datum),
+        peligrosEspecificos: cleanList(req.body.peligrosEspecificos), zonaUtm: "", datum: "",
         condicionesIngreso: clean(req.body.condicionesIngreso), trabajoAltoRiesgo: clean(req.body.trabajoAltoRiesgo), accesibilidadPuntos: clean(req.body.accesibilidadPuntos),
-        estaciones: parseJson(req.body.estaciones, []), adjuntos: savedAttachments.map(({ path, ...file }) => file),
-        destinatarioInforme: parseJson(req.body.destinatarioInforme, {}), contacto,
+        // El formulario comercial ya no captura estaciones; esta información
+        // se completará en el flujo operativo cuando corresponda.
+        estaciones: [], adjuntos: savedAttachments.map(({ path, ...file }) => file),
+        destinatarioInforme: (() => {
+          const destinatario = parseJson(req.body.destinatarioInforme, {});
+          return { ...destinatario, razonSocial: upper(destinatario.razonSocial), ruc: upper(destinatario.ruc) };
+        })(), contacto,
       });
       return res.status(201).json({ message: "Recibimos tu solicitud. El equipo comercial revisará la información para preparar la cotización.", type: "Correcto", data: solicitud });
     } catch (error) {

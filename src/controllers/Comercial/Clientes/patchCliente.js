@@ -1,5 +1,7 @@
 const Comercial_Clientes = require("../../../Models/Comercial/Clientes");
 
+const upper = (value) => typeof value === "string" ? value.trim().toUpperCase() : value;
+
 const patchCliente = async (req, res) => {
     const { id } = req.params;
     const {
@@ -20,9 +22,9 @@ const patchCliente = async (req, res) => {
         }
 
         if (tipoCliente) findCliente.tipoCliente = tipoCliente;
-        if (cliente) findCliente.cliente = cliente;
-        if (numeroDocumento) findCliente.numeroDocumento = numeroDocumento;
-        if (nombreContacto) findCliente.nombreContacto = nombreContacto;
+        if (cliente) findCliente.cliente = upper(cliente);
+        if (numeroDocumento) findCliente.numeroDocumento = upper(numeroDocumento);
+        if (nombreContacto) findCliente.nombreContacto = upper(nombreContacto);
         if (telefono) findCliente.telefono = telefono;
         if (correoElectronico) findCliente.correoElectronico = correoElectronico;
         if (direccionLegal) findCliente.direccionLegal = direccionLegal;

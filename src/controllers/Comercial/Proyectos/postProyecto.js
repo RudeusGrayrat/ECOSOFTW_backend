@@ -1,5 +1,7 @@
 const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
 
+const upper = (value) => typeof value === "string" ? value.trim().toUpperCase() : value;
+
 const postProyectos = async (req, res) => {
   const {
     cliente_id,
@@ -17,8 +19,8 @@ const postProyectos = async (req, res) => {
     }
     const nuevoProyecto = new Comercial_Proyectos({
       cliente_id,
-      nombre,
-      servicio,
+      nombre: upper(nombre),
+      servicio: upper(servicio),
       fechaServicio,
       cantidadPuntosParametros: typeof cantidadPuntosParametros === "string" ? cantidadPuntosParametros.trim() : cantidadPuntosParametros,
       lugarMuestreo,

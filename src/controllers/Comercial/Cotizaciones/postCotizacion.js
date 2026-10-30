@@ -5,6 +5,15 @@ const Parametro = require("../../../Models/Comercial/Parametros");
 const TipoDeGasto = require("../../../Models/Comercial/TipoDeGastos");
 const generarCorrelativa = require("./correlativa");
 
+const upper = (value) => typeof value === "string" ? value.trim().toUpperCase() : value;
+const round2 = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const numberOr = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const totalsFor = (analisis = [], operativos = [], administrativos = []) => {
+  const totalSinIgv = round2([...analisis, ...operativos, ...administrativos].reduce((total, item) => total + numberOr(item.subtotal), 0));
+  const igv = round2(totalSinIgv * 0.18);
+  return { totalSinIgv, igv, totalConIgv: round2(totalSinIgv + igv) };
+};
+
 const snapshotProyecto = (proyecto) => ({
   nombre: proyecto?.nombre || "según cadena de custodia",
   servicio: proyecto?.servicio || "",
@@ -30,21 +39,29 @@ const snapshotSolicitud = (solicitud) => {
 };
 
 const gastosCorrespondenACategoria = async (gastos = [], categoria) => {
-  const ids = gastos.map((item) => item.tipoDeGasto_id?.toString()).filter(Boolean);
+  const rawIds = gastos.map((item) => item.tipoDeGasto_id?.toString());
+  if (rawIds.some((id) => !id)) return false;
+  const ids = rawIds;
   if (!ids.length) return true;
   const validos = await TipoDeGasto.countDocuments({ _id: { $in: ids }, categoria, estado: "ACTIVO" });
   return validos === new Set(ids).size;
 };
 const withExpenseSnapshots = async (gastos = [], categoria) => {
-  const ids = [...new Set(gastos.map((item) => item.tipoDeGasto_id?.toString()).filter(Boolean))];
+  const rawIds = gastos.map((item) => item.tipoDeGasto_id?.toString());
+  if (rawIds.some((id) => !id)) throw new Error("Cada gasto debe seleccionar un tipo de gasto válido");
+  const ids = [...new Set(rawIds)];
   if (!ids.length) return gastos;
   const tipos = await TipoDeGasto.find({ _id: { $in: ids }, categoria, estado: "ACTIVO" }).lean();
   const byId = new Map(tipos.map((tipo) => [tipo._id.toString(), tipo]));
   if (byId.size !== ids.length) throw new Error("Uno o más gastos no pertenecen a la categoría seleccionada o están inactivos");
   return gastos.map((gasto) => {
     const tipo = gasto.tipoDeGasto_id ? byId.get(gasto.tipoDeGasto_id.toString()) : null;
-    if (!tipo) return gasto;
-    return { ...gasto, gastoSnapshot: { codigo: tipo.codigo || "", tipoDeGasto: tipo.tipoDeGasto, categoria: tipo.categoria, descripcion: tipo.descripcion, precio: tipo.precio, origen: tipo.origen || "MANUAL", unidadReferencia: tipo.unidadReferencia || "FIJO", vigenciaDesde: tipo.vigenciaDesde, vigenciaHasta: tipo.vigenciaHasta } };
+    if (!tipo) throw new Error("El tipo de gasto seleccionado no es válido");
+    const cantidad = numberOr(gasto.cantidad);
+    const dias = categoria === "OPERATIVO" ? numberOr(gasto.dias) : undefined;
+    const precioUnitario = numberOr(gasto.precio ?? gasto.precioUnitario, numberOr(tipo.precio));
+    const subtotal = round2(precioUnitario * cantidad * (categoria === "OPERATIVO" ? dias : 1));
+    return { ...gasto, cantidad, ...(categoria === "OPERATIVO" ? { dias } : {}), precioUnitario, subtotal, gastoSnapshot: { codigo: tipo.codigo || "", tipoDeGasto: tipo.tipoDeGasto, categoria: tipo.categoria, descripcion: tipo.descripcion, precio: tipo.precio, origen: tipo.origen || "MANUAL", unidadReferencia: tipo.unidadReferencia || "FIJO", vigenciaDesde: tipo.vigenciaDesde, vigenciaHasta: tipo.vigenciaHasta } };
   });
 };
 
@@ -57,17 +74,13 @@ const postCotizacion = async (req, res) => {
     analisis,
     gastosOperativos,
     gastosAdministrativos,
-    gastosGenerales,
-    totalSinIgv,
-    totalConIgv,
-    igv,
     estado,
     facturacion,
     creadoPor,
     fechaElaboracion,
   } = req.body;
   try {
-    if (!proyecto_id || !totalSinIgv || !totalConIgv || !igv || !creadoPor) {
+    if (!proyecto_id || !creadoPor) {
       return res
         .status(400)
         .json({ message: "Faltan campos obligatorios en la solicitud.", type: "Aviso" });
@@ -85,12 +98,17 @@ const postCotizacion = async (req, res) => {
       ? await SolicitudCotizacion.findById(solicitudVinculada).populate("parametrosSolicitados.parametro_id")
       : null;
     const parameterIds = [...new Set((analisis || []).map((item) => item.parametro_id?.toString()).filter(Boolean))];
+    if (!parameterIds.length || parameterIds.length !== (analisis || []).length) {
+      return res.status(400).json({ message: "Agrega al menos un parámetro válido a la cotización.", type: "Advertencia" });
+    }
     const parameters = await Parametro.find({ _id: { $in: parameterIds }, estado: { $ne: "INACTIVO" } }).lean();
     const parameterMap = new Map(parameters.map((parameter) => [parameter._id.toString(), parameter]));
     if (parameterMap.size !== parameterIds.length) return res.status(400).json({ message: "Uno o más parámetros no existen o están inactivos. Actualiza la cotización.", type: "Advertencia" });
     const analysisWithSnapshot = (analisis || []).map((analysis) => {
       const parameter = parameterMap.get(analysis.parametro_id.toString());
-      return { ...analysis, parametroSnapshot: { tipoDeAnalisis: parameter.tipoDeAnalisis, categoria: parameter.categoria, nombreCorto: parameter.nombreCorto, parametro: parameter.parametro, componentes: parameter.componentes, tipoItem: parameter.tipoItem, unidadCobro: parameter.unidadCobro, metodo: parameter.metodo, acreditadoPor: parameter.acreditadoPor, tipoDeAcreditacion: parameter.tipoDeAcreditacion, limiteDeCuantificacionDelMetodo: parameter.limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo: parameter.limiteDeDeteccionDelMetodo, unidadDeMedida: parameter.unidadDeMedida, precio: parameter.precio, vigenciaDesde: parameter.vigenciaDesde, vigenciaHasta: parameter.vigenciaHasta } };
+      const cantidad = numberOr(analysis.cantidad);
+      const precioUnitario = numberOr(analysis.precio ?? analysis.precioUnitario, numberOr(parameter.precio));
+      return { ...analysis, cantidad, precioUnitario, subtotal: round2(precioUnitario * cantidad), parametroSnapshot: { tipoDeAnalisis: parameter.tipoDeAnalisis, categoria: parameter.categoria, nombreCorto: parameter.nombreCorto, parametro: parameter.parametro, componentes: parameter.componentes, tipoItem: parameter.tipoItem, unidadCobro: parameter.unidadCobro, metodo: parameter.metodo, acreditadoPor: parameter.acreditadoPor, tipoDeAcreditacion: parameter.tipoDeAcreditacion, limiteDeCuantificacionDelMetodo: parameter.limiteDeCuantificacionDelMetodo, limiteDeDeteccionDelMetodo: parameter.limiteDeDeteccionDelMetodo, unidadDeMedida: parameter.unidadDeMedida, precio: parameter.precio, vigenciaDesde: parameter.vigenciaDesde, vigenciaHasta: parameter.vigenciaHasta } };
     });
     const [operativosCorrectos, administrativosCorrectos] = await Promise.all([
       gastosCorrespondenACategoria(gastosOperativos, "OPERATIVO"),
@@ -103,6 +121,7 @@ const postCotizacion = async (req, res) => {
       withExpenseSnapshots(gastosOperativos || [], "OPERATIVO"),
       withExpenseSnapshots(gastosAdministrativos || [], "ADMINISTRATIVO"),
     ]);
+    const totals = totalsFor(analysisWithSnapshot, gastosOperativosSnapshot, gastosAdministrativosSnapshot);
     const nuevaCotizacion = new Comercial_Cotizaciones({
       correlativa,
       correlativaVisible,
@@ -111,17 +130,19 @@ const postCotizacion = async (req, res) => {
       solicitud_id: solicitudVinculada,
       proyectoSnapshot: snapshotProyecto(proyecto),
       solicitudSnapshot: snapshotSolicitud(solicitud),
-      tipoDeServicio,
+      tipoDeServicio: upper(tipoDeServicio),
       tiempoDeEntrega,
       analisis: analysisWithSnapshot,
       gastosOperativos: gastosOperativosSnapshot,
       gastosAdministrativos: gastosAdministrativosSnapshot,
-      gastosGenerales,
-      totalSinIgv,
-      totalConIgv,
-      igv,
+      gastosGenerales: [],
+      ...totals,
       estado: estado || "PENDIENTE",
-      facturacion,
+      facturacion: facturacion ? {
+        ...facturacion,
+        razonSocial: upper(facturacion.razonSocial),
+        ruc: upper(facturacion.ruc),
+      } : facturacion,
       creadoPor
     });
     await nuevaCotizacion.save();

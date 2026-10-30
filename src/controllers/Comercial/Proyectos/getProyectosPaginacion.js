@@ -1,5 +1,6 @@
 const Comercial_Clientes = require("../../../Models/Comercial/Clientes");
 const Comercial_Proyectos = require("../../../Models/Comercial/Proyectos");
+const escapeRegExp = require("../../../utils/escapeRegex");
 
 const getProyectosPagination = async (req, res) => {
     try {
