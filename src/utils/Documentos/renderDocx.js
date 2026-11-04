@@ -18,6 +18,16 @@ const getImage = (value) => {
 
 module.exports = async (data, filePath) => {
   const zip = new PizZip(fs.readFileSync(filePath, "binary"));
+  // La plantilla de Plan de Monitoreo usa {{#items}} pero su cierre quedó como
+  // {{/ítems}}. Docxtemplater exige que ambos nombres coincidan. Se normaliza
+  // únicamente en la copia que se genera en memoria: el Word original nunca se
+  // modifica ni se reemplaza en storage.
+  Object.keys(zip.files)
+    .filter((name) => /^word\/(document|header\d*|footer\d*)\.xml$/.test(name))
+    .forEach((name) => {
+      const content = zip.file(name)?.asText();
+      if (content?.includes("{{/ítems}}")) zip.file(name, content.replaceAll("{{/ítems}}", "{{/items}}"));
+    });
   const imageModule = new ImageModule({ centered: false, getImage, getSize: (_image, _value, tag) => tag.toLowerCase().includes("firma") ? [150, 70] : [120, 70] });
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: "{{", end: "}}" }, modules: [imageModule] });
   // Todas las imágenes ya llegan como buffers/rutas locales. render() evita el

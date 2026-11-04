@@ -27,7 +27,7 @@ const templateFor = async (tipo, traceId) => {
   const file = templatePath(template.archivo);
   pdfTrace(traceId, "template.lookup.found", { tipo, templateId: template._id.toString(), archivo: template.archivo, file, exists: fs.existsSync(file) });
   if (!fs.existsSync(file)) throw new Error(`No se encontró el archivo de la plantilla activa: ${file}`);
-  return file;
+  return { file, metadata: template };
 };
 const hydrateImages = async (data, traceId) => {
   for (const key of Object.keys(data)) {
@@ -46,7 +46,14 @@ const sendPdf = async (res, data, tipo, name, traceId) => {
   await hydrateImages(data, traceId);
   const template = await templateFor(tipo, traceId);
   pdfTrace(traceId, "docx.render.start", { tipo });
-  const docx = await renderDocx(data, template);
+  const docx = await renderDocx({
+    // Datos de control del formato. Son independientes del documento generado
+    // y se actualizan al reemplazar o editar la plantilla activa.
+    correlativa: template.metadata.nombre || "",
+    version: template.metadata.version || "",
+    fecha_vigencia: date(template.metadata.vigenciaDesde),
+    ...data,
+  }, template.file);
   pdfTrace(traceId, "docx.render.done", { bytes: docx.length });
   pdfTrace(traceId, "pdf.convert.start", { binary: process.env.UNOCONVERT_BIN || "unoconvert" });
   const pdf = await convertToPdf(docx);
@@ -57,7 +64,7 @@ const pdfError = (res, error, traceId, documentId, tipo) => {
   console.error("[PDF]", JSON.stringify({ traceId, stage: "generation.failed", tipo, documentId, message: error.message, stack: error.stack }));
   return res.status(500).json({ message: error.message, type: "Error", traceId });
 };
-const item = (row) => { const parameter = row.parametroSnapshot || row.parametro_id || {}; return { matriz: row.matriz || parameter.tipoDeAnalisis || "", parametro: row.parametro || parameter.parametro || "", metodologia: row.metodologia || parameter.metodo || "", cantidad: row.cantidad || "", acreditacion: row.acreditacion || parameter.acreditadoPor || "", laboratorio: row.laboratorio || row.proveedor || "" }; };
+const item = (row) => { const parameter = row.parametroSnapshot || row.parametro_id || {}; const parametro = row.parametro || parameter.parametro || ""; return { matriz: row.matriz || parameter.tipoDeAnalisis || "", parametro, parametros: parametro, metodologia: row.metodologia || parameter.metodo || "", cantidad: row.cantidad || "", acreditacion: row.acreditacion || parameter.acreditadoPor || "", laboratorio: row.laboratorio || row.proveedor || "" }; };
 const money = (value) => `S/. ${Number(value || 0).toFixed(2)}`;
 const sum = (rows = []) => rows.reduce((total, row) => total + Number(row.monto ?? row.subtotal ?? 0), 0);
 const analyst = (row) => {
@@ -115,14 +122,60 @@ exports.cotizacion = async (req, res) => {
   } catch (error) { return pdfError(res, error, traceId, req.params.id, "COTIZACION"); }
 };
 
+const userName = (user) => user?.colaborador || user?.userName || "";
 const operationalData = (document, order = false) => {
-  const elaboradoPor = document.elaboradoPor || document.creadoPor;
-  return { codigo: document.codigo, codigo_cotizacion: document.cotizacion_id?.correlativaVisible || "", fecha_elaboracion: date(document.createdAt), cliente: document.cliente?.razonSocial || "", ruc: document.cliente?.ruc || "", contacto: document.cliente?.contacto || "", telefono: document.cliente?.telefono || "", correo: document.cliente?.correo || "", proyecto: document.proyecto?.nombre || "", planta: document.proyecto?.planta || "", lugar_muestreo: document.proyecto?.lugarEjecucion || "", fecha_servicio: date(document.proyecto?.fechaServicio), condiciones_ingreso: document.condicionesIngreso || "", trabajo_alto_riesgo: document.trabajoAltoRiesgo || "", accesibilidad: document.accesibilidadPuntos || "", estaciones: document.estaciones || [], items: (document.items || []).map(item), analista_operaciones: document.analistaOperaciones?.colaborador || document.analistaOperacionesManual || "", elaborado_por: elaboradoPor?.colaborador || elaboradoPor?.userName || "", firma_elaborado: elaboradoPor?.firma || "", es_orden: order };
+  const elaboradoPor = document.elaboradoPor || document.cotizacion_id?.creadoPor || document.creadoPor;
+  const analista = document.analistaOperaciones?.colaborador || document.analistaOperacionesManual || "";
+  const apoyo = [
+    ...(document.programacion?.personal || []).map(userName),
+    ...(document.programacion?.personalExterno || []),
+  ].filter((name) => name && name !== analista);
+  const observacionesGenerales = document.trabajoAltoRiesgo && document.trabajoAltoRiesgo !== "NO"
+    ? `Trabajo de alto riesgo: ${document.trabajoAltoRiesgo}`
+    : "";
+  return {
+    codigo: document.codigo,
+    codigo_cotizacion: document.cotizacion_id?.correlativaVisible || "",
+    fecha_elaboracion: date(document.createdAt),
+    estado_operacion: document.programacion?.estadoOperacion || document.estado || "",
+    cliente: document.cliente?.razonSocial || "",
+    ruc: document.cliente?.ruc || "",
+    contacto: document.cliente?.contacto || "",
+    telefono: document.cliente?.telefono || "",
+    correo: document.cliente?.correo || "",
+    proyecto: document.proyecto?.nombre || "",
+    planta: document.proyecto?.planta || "",
+    lugar_muestreo: document.proyecto?.lugarEjecucion || "",
+    fecha_servicio: date(document.proyecto?.fechaServicio),
+    condiciones_ingreso: document.condicionesIngreso || "",
+    trabajo_alto_riesgo: document.trabajoAltoRiesgo || "",
+    accesibilidad: document.accesibilidadPuntos || "",
+    estaciones: document.estaciones || [],
+    items: (document.items || []).map(item),
+    analista_operaciones: analista,
+    elaborado_por: userName(elaboradoPor),
+    elaboradoPor: userName(elaboradoPor),
+    elaboradorPor: userName(elaboradoPor),
+    revisadoPor: analista,
+    aprobadoPor: userName(document.cotizacion_id?.aprobadoPor),
+    firma_elaborado: signaturePath(elaboradoPor),
+    otros_observaciones: observacionesGenerales,
+    // Estos checks requieren selección explícita en la edición del Plan. Se
+    // entregan vacíos en lugar de inferir datos técnicos desde texto libre.
+    disponibilidad_lugar_si: "", disponibilidad_lugar_no: "", ingreso_camioneta: "",
+    grupo_electrogeno: "", seguridadd_cliente: "", seguridad_ecology: "",
+    punto_energia: "", personal_caminando: "", observaciones_aspa: document.condicionesIngreso || "",
+    observacion_monitoreo: document.accesibilidadPuntos || "",
+    personal_apoyo_1: apoyo[0] || "", personal_apoyo_2: apoyo[1] || "", personal_apoyo_3: apoyo[2] || "",
+    grupo_trabajo_observaciones: document.programacion?.observaciones || "",
+    parametros_observaciones: "",
+    es_orden: order,
+  };
 };
 
 exports.plan = async (req, res) => {
   const traceId = randomUUID();
-  try { pdfTrace(traceId, "plan.load.start", { planId: req.params.id }); const plan = await Plan.findById(req.params.id).populate("elaboradoPor analistaOperaciones").populate({ path: "cotizacion_id", select: "correlativaVisible" }); if (!plan) return res.status(404).json({ message: "Plan no encontrado", type: "Error" }); return sendPdf(res, operationalData(plan), "PLAN_TRABAJO", plan.codigo.replace(/\s/g, "_"), traceId); } catch (error) { return pdfError(res, error, traceId, req.params.id, "PLAN_TRABAJO"); }
+  try { pdfTrace(traceId, "plan.load.start", { planId: req.params.id }); const plan = await Plan.findById(req.params.id).populate("elaboradoPor analistaOperaciones creadoPor programacion.personal").populate({ path: "cotizacion_id", select: "correlativaVisible creadoPor aprobadoPor", populate: [{ path: "creadoPor", select: "colaborador userName correoElectronico telefono puesto" }, { path: "aprobadoPor", select: "colaborador userName" }] }); if (!plan) return res.status(404).json({ message: "Plan no encontrado", type: "Error" }); return sendPdf(res, operationalData(plan), "PLAN_TRABAJO", plan.codigo.replace(/\s/g, "_"), traceId); } catch (error) { return pdfError(res, error, traceId, req.params.id, "PLAN_TRABAJO"); }
 };
 exports.orden = async (req, res) => {
   const traceId = randomUUID();

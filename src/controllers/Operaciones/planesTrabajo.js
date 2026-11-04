@@ -12,22 +12,22 @@ exports.crearPlan = async (req, res) => {
     if (!quote) return res.status(404).json({ message: "Cotización no encontrada", type: "Error" });
     if (quote.estado !== "APROBADO") return res.status(400).json({ message: "Solo se puede generar un plan desde una cotización aprobada", type: "Advertencia" });
     const existing = await Plan.findOne({ cotizacion_id: quote._id });
-    if (existing) return res.json({ message: "El Plan de Trabajo ya existe", type: "Correcto", data: existing });
+    if (existing) return res.json({ message: "El Plan de Monitoreo ya existe", type: "Correcto", data: existing });
     const request = quote.solicitud_id ? await Solicitud.findById(quote.solicitud_id) : null;
     const now = new Date(); const suffix = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
     const last = await Plan.findOne({ codigo: new RegExp(`-${suffix}$`) }).sort({ correlativo: -1 }).lean();
     const correlativo = (last?.correlativo || 0) + 1;
     const client = quote.proyecto_id?.cliente_id || {};
     const fechaServicio = request?.fechaServicio || quote.proyecto_id?.fechaServicio;
-    const plan = await Plan.create({ cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio }, programacion: fechaServicio ? { fechaInicio: fechaServicio, fechaFin: fechaServicio, estadoOperacion: "PROGRAMADO" } : {}, condicionesIngreso: request?.condicionesIngreso, trabajoAltoRiesgo: request?.trabajoAltoRiesgo, accesibilidadPuntos: request?.accesibilidadPuntos, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), creadoPor: req.body.creadoPor });
-    return res.status(201).json({ message: "Plan de Trabajo creado", type: "Correcto", data: plan });
+    const plan = await Plan.create({ cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio }, programacion: fechaServicio ? { fechaInicio: fechaServicio, fechaFin: fechaServicio, estadoOperacion: "PROGRAMADO" } : {}, condicionesIngreso: request?.condicionesIngreso, trabajoAltoRiesgo: request?.trabajoAltoRiesgo, accesibilidadPuntos: request?.accesibilidadPuntos, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), elaboradoPor: quote.creadoPor, creadoPor: req.body.creadoPor });
+    return res.status(201).json({ message: "Plan de Monitoreo creado", type: "Correcto", data: plan });
   } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
 };
 
 exports.crearOrden = async (req, res) => {
   try {
     const plan = await Plan.findById(req.params.planId);
-    if (!plan) return res.status(404).json({ message: "Plan de Trabajo no encontrado", type: "Error" });
+    if (!plan) return res.status(404).json({ message: "Plan de Monitoreo no encontrado", type: "Error" });
     const existing = await Orden.findOne({ plan_id: plan._id }); if (existing) return res.json({ message: "La Orden Interna ya existe", type: "Correcto", data: existing });
     const quote = await Cotizacion.findById(plan.cotizacion_id).populate("analisis.parametro_id");
     const thirdParty = quote.analisis.filter((item) => item.modalidad === "TERCERIZADO").map(mapItem);
@@ -92,7 +92,7 @@ exports.actualizarPlan = async (req, res) => {
   }
   Object.assign(plan, changes);
   const data = await plan.save();
-  return res.json({ data, message: "Plan de Trabajo actualizado", type: "Correcto" });
+  return res.json({ data, message: "Plan de Monitoreo actualizado", type: "Correcto" });
 };
 
 exports.actualizarOrden = async (req, res) => {
