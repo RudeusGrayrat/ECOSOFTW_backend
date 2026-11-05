@@ -126,6 +126,7 @@ const userName = (user) => user?.colaborador || user?.userName || "";
 const operationalData = (document, order = false) => {
   const elaboradoPor = document.elaboradoPor || document.cotizacion_id?.creadoPor || document.creadoPor;
   const analista = document.analistaOperaciones?.colaborador || document.analistaOperacionesManual || "";
+  const consideraciones = document.consideracionesMonitoreo || {};
   const apoyo = [
     ...(document.programacion?.personal || []).map(userName),
     ...(document.programacion?.personalExterno || []),
@@ -160,11 +161,17 @@ const operationalData = (document, order = false) => {
     aprobadoPor: userName(document.cotizacion_id?.aprobadoPor),
     firma_elaborado: signaturePath(elaboradoPor),
     otros_observaciones: observacionesGenerales,
-    // Estos checks requieren selección explícita en la edición del Plan. Se
-    // entregan vacíos en lugar de inferir datos técnicos desde texto libre.
-    disponibilidad_lugar_si: "", disponibilidad_lugar_no: "", ingreso_camioneta: "",
-    grupo_electrogeno: "", seguridadd_cliente: "", seguridad_ecology: "",
-    punto_energia: "", personal_caminando: "", observaciones_aspa: document.condicionesIngreso || "",
+    // Checks explícitamente confirmados por Operaciones. El nombre
+    // `seguridadd_cliente` conserva la variable ya existente en el Word.
+    disponibilidad_lugar_si: consideraciones.disponibilidadLugar === "SI" ? "X" : "",
+    disponibilidad_lugar_no: consideraciones.disponibilidadLugar === "NO" ? "X" : "",
+    ingreso_camioneta: consideraciones.ingresoCamioneta ? "X" : "",
+    grupo_electrogeno: consideraciones.grupoElectrogeno ? "X" : "",
+    seguridadd_cliente: consideraciones.seguridadCliente ? "X" : "",
+    seguridad_ecology: consideraciones.seguridadEcology ? "X" : "",
+    punto_energia: consideraciones.puntoEnergia ? "X" : "",
+    personal_caminando: consideraciones.personalCaminando ? "X" : "",
+    observaciones_aspa: consideraciones.observaciones || document.condicionesIngreso || "",
     observacion_monitoreo: document.accesibilidadPuntos || "",
     personal_apoyo_1: apoyo[0] || "", personal_apoyo_2: apoyo[1] || "", personal_apoyo_3: apoyo[2] || "",
     grupo_trabajo_observaciones: document.programacion?.observaciones || "",

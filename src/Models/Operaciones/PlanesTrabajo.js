@@ -2,6 +2,18 @@ const mongoose = require("mongoose");
 
 const itemSchema = new mongoose.Schema({ matriz: String, parametro: String, metodologia: String, cantidad: Number, acreditacion: String, laboratorio: String }, { _id: false });
 const stationSchema = new mongoose.Schema({ codigo: String, este: String, norte: String, descripcion: String }, { _id: false });
+// Decisiones confirmadas por Operaciones; no se infieren de los comentarios
+// libres enviados por el cliente.
+const consideracionesMonitoreoSchema = new mongoose.Schema({
+  disponibilidadLugar: { type: String, enum: ["", "SI", "NO"], default: "" },
+  ingresoCamioneta: { type: Boolean, default: false },
+  grupoElectrogeno: { type: Boolean, default: false },
+  seguridadCliente: { type: Boolean, default: false },
+  seguridadEcology: { type: Boolean, default: false },
+  puntoEnergia: { type: Boolean, default: false },
+  personalCaminando: { type: Boolean, default: false },
+  observaciones: { type: String, default: "" },
+}, { _id: false });
 const programacionSchema = new mongoose.Schema({
   fechaInicio: Date,
   fechaFin: Date,
@@ -31,6 +43,7 @@ const planTrabajoSchema = new mongoose.Schema({
   condicionesIngreso: String,
   trabajoAltoRiesgo: String,
   accesibilidadPuntos: String,
+  consideracionesMonitoreo: { type: consideracionesMonitoreoSchema, default: () => ({}) },
   estaciones: [stationSchema],
   items: [itemSchema],
   programacion: { type: programacionSchema, default: () => ({}) },

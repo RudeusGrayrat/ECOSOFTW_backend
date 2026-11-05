@@ -19,7 +19,7 @@ exports.crearPlan = async (req, res) => {
     const correlativo = (last?.correlativo || 0) + 1;
     const client = quote.proyecto_id?.cliente_id || {};
     const fechaServicio = request?.fechaServicio || quote.proyecto_id?.fechaServicio;
-    const plan = await Plan.create({ cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio }, programacion: fechaServicio ? { fechaInicio: fechaServicio, fechaFin: fechaServicio, estadoOperacion: "PROGRAMADO" } : {}, condicionesIngreso: request?.condicionesIngreso, trabajoAltoRiesgo: request?.trabajoAltoRiesgo, accesibilidadPuntos: request?.accesibilidadPuntos, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), elaboradoPor: quote.creadoPor, creadoPor: req.body.creadoPor });
+    const plan = await Plan.create({ cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio }, programacion: fechaServicio ? { fechaInicio: fechaServicio, fechaFin: fechaServicio, estadoOperacion: "PROGRAMADO" } : {}, condicionesIngreso: request?.condicionesIngreso, trabajoAltoRiesgo: request?.trabajoAltoRiesgo, accesibilidadPuntos: request?.accesibilidadPuntos, consideracionesMonitoreo: {}, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), elaboradoPor: quote.creadoPor, creadoPor: req.body.creadoPor });
     return res.status(201).json({ message: "Plan de Monitoreo creado", type: "Correcto", data: plan });
   } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
 };
@@ -37,6 +37,7 @@ exports.crearOrden = async (req, res) => {
       codigo: `ORDEN DE SERVICIO ${String(plan.correlativo).padStart(3, "0")}-${new Date(plan.createdAt).getFullYear()}`,
       cliente: plan.cliente, proyecto: plan.proyecto, condicionesIngreso: plan.condicionesIngreso,
       trabajoAltoRiesgo: plan.trabajoAltoRiesgo, accesibilidadPuntos: plan.accesibilidadPuntos,
+      consideracionesMonitoreo: plan.consideracionesMonitoreo?.toObject?.() || plan.consideracionesMonitoreo || {},
       estaciones: plan.estaciones, items: thirdParty, creadoPor: req.body.creadoPor
     });
     return res.status(201).json({ message: "Orden Interna creada", type: "Correcto", data: order });
@@ -75,7 +76,7 @@ exports.listarOrdenes = async (req, res) => {
 };
 
 exports.actualizarPlan = async (req, res) => {
-  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "estaciones", "items", "analistaOperaciones", "analistaOperacionesManual", "elaboradoPor", "estado", "programacion"];
+  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "analistaOperaciones", "analistaOperacionesManual", "elaboradoPor", "estado", "programacion"];
   const changes = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
   const plan = await Plan.findById(req.params.id);
   if (!plan) return res.status(404).json({ message: "Plan no encontrado", type: "Error" });
@@ -96,7 +97,7 @@ exports.actualizarPlan = async (req, res) => {
 };
 
 exports.actualizarOrden = async (req, res) => {
-  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "estaciones", "items", "estado"];
+  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "estado"];
   const changes = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
   const data = await Orden.findByIdAndUpdate(req.params.id, changes, { new: true });
   return data ? res.json({ data, message: "Orden Interna actualizada", type: "Correcto" }) : res.status(404).json({ message: "Orden no encontrada", type: "Error" });

@@ -25,20 +25,22 @@ const withParameterSnapshots = async (analisis = []) => {
     });
 };
 const withExpenseSnapshots = async (gastos = [], categoria) => {
-    const rawIds = gastos.map((item) => item.tipoDeGasto_id?._id?.toString() || item.tipoDeGasto_id?.toString());
-    if (rawIds.some((id) => !id)) throw new Error("Cada gasto debe seleccionar un tipo de gasto válido");
+    const rawIds = gastos.map((item) => item.tipoDeGasto_id?._id?.toString() || item.tipoDeGasto_id?.toString()).filter(Boolean);
     const ids = [...new Set(rawIds)];
     const tipos = await TipoDeGasto.find({ _id: { $in: ids }, categoria, estado: "ACTIVO" }).lean();
     const byId = new Map(tipos.map((tipo) => [tipo._id.toString(), tipo]));
     if (byId.size !== ids.length) throw new Error("Uno o más gastos no pertenecen a la categoría seleccionada o están inactivos");
     return gastos.map((gasto) => {
         const id = gasto.tipoDeGasto_id?._id?.toString() || gasto.tipoDeGasto_id?.toString();
-        const tipo = byId.get(id);
-        if (!tipo) return gasto;
+        const tipo = id ? byId.get(id) : null;
+        const descripcionManual = typeof gasto.descripcion === "string" ? gasto.descripcion.trim() : "";
+        if (!tipo && !descripcionManual) throw new Error("Indica un tipo de gasto o una descripción para OTRO");
         const cantidad = Number(gasto.cantidad || 0);
         const dias = categoria === "OPERATIVO" ? Number(gasto.dias || 0) : undefined;
-        const precioUnitario = Number.isFinite(Number(gasto.precio ?? gasto.precioUnitario)) ? Number(gasto.precio ?? gasto.precioUnitario) : Number(tipo.precio || 0);
-        return { ...gasto, tipoDeGasto_id: id, cantidad, ...(categoria === "OPERATIVO" ? { dias } : {}), precioUnitario, subtotal: round2(precioUnitario * cantidad * (categoria === "OPERATIVO" ? dias : 1)), gastoSnapshot: { codigo: tipo.codigo || "", tipoDeGasto: tipo.tipoDeGasto, categoria: tipo.categoria, descripcion: tipo.descripcion, precio: tipo.precio, origen: tipo.origen || "MANUAL", unidadReferencia: tipo.unidadReferencia || "FIJO", vigenciaDesde: tipo.vigenciaDesde, vigenciaHasta: tipo.vigenciaHasta } };
+        const precioUnitario = Number.isFinite(Number(gasto.precio ?? gasto.precioUnitario)) ? Number(gasto.precio ?? gasto.precioUnitario) : Number(tipo?.precio || 0);
+        return { ...gasto, ...(tipo ? { tipoDeGasto_id: id } : { tipoDeGasto_id: undefined }), cantidad, ...(categoria === "OPERATIVO" ? { dias } : {}), precioUnitario, subtotal: round2(precioUnitario * cantidad * (categoria === "OPERATIVO" ? dias : 1)), gastoSnapshot: tipo
+            ? { codigo: tipo.codigo || "", tipoDeGasto: tipo.tipoDeGasto, categoria: tipo.categoria, descripcion: tipo.descripcion, precio: tipo.precio, origen: tipo.origen || "MANUAL", unidadReferencia: tipo.unidadReferencia || "FIJO", vigenciaDesde: tipo.vigenciaDesde, vigenciaHasta: tipo.vigenciaHasta }
+            : { codigo: "", tipoDeGasto: "OTRO", categoria, descripcion: descripcionManual, precio: precioUnitario, origen: "MANUAL", unidadReferencia: "FIJO" } };
     });
 };
 

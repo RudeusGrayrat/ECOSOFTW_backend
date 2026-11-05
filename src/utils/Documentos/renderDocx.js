@@ -26,7 +26,26 @@ module.exports = async (data, filePath) => {
     .filter((name) => /^word\/(document|header\d*|footer\d*)\.xml$/.test(name))
     .forEach((name) => {
       const content = zip.file(name)?.asText();
-      if (content?.includes("{{/ítems}}")) zip.file(name, content.replaceAll("{{/ítems}}", "{{/items}}"));
+      if (!content) return;
+      // Word puede dividir un marcador entre varios nodos XML; por eso no se
+      // busca solamente la cadena literal. Dentro de cualquier cierre de
+      // bloque convertimos la i acentuada/entidad HTML a la clave técnica.
+      // Solo modifica el marcador de plantilla en memoria, no el Word ni el
+      // texto visible del documento.
+      const normalized = content
+        // Puede conservar ambos { en el mismo nodo o dividir el primero en el
+        // nodo anterior: `{{/ítems}}` o `{/ítems}}`.
+        .replaceAll("{{/ítems}}", "{{/items}}")
+        .replaceAll("{/ítems}}", "{/items}}")
+        .replaceAll("{{/i\u0301tems}}", "{{/items}}")
+        .replaceAll("{/i\u0301tems}}", "{/items}}")
+        .replaceAll("{{/&#237;tems}}", "{{/items}}")
+        .replaceAll("{/&#237;tems}}", "{/items}}")
+        .replaceAll("{{/&#xED;tems}}", "{{/items}}")
+        .replaceAll("{/&#xED;tems}}", "{/items}}")
+        .replaceAll("{{/&#xed;tems}}", "{{/items}}")
+        .replaceAll("{/&#xed;tems}}", "{/items}}");
+      if (normalized !== content) zip.file(name, normalized);
     });
   const imageModule = new ImageModule({ centered: false, getImage, getSize: (_image, _value, tag) => tag.toLowerCase().includes("firma") ? [150, 70] : [120, 70] });
   const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, delimiters: { start: "{{", end: "}}" }, modules: [imageModule] });

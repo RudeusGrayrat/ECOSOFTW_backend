@@ -1,6 +1,18 @@
 const mongoose = require("mongoose");
 const itemSchema = new mongoose.Schema({ matriz: String, parametro: String, metodologia: String, cantidad: Number, acreditacion: String, laboratorio: String }, { _id: false });
 const stationSchema = new mongoose.Schema({ codigo: String, este: String, norte: String, descripcion: String }, { _id: false });
+// Snapshot editable propio de la Orden: una corrección al despacho de un
+// tercero no debe alterar retroactivamente el Plan de Monitoreo.
+const consideracionesMonitoreoSchema = new mongoose.Schema({
+  disponibilidadLugar: { type: String, enum: ["", "SI", "NO"], default: "" },
+  ingresoCamioneta: { type: Boolean, default: false },
+  grupoElectrogeno: { type: Boolean, default: false },
+  seguridadCliente: { type: Boolean, default: false },
+  seguridadEcology: { type: Boolean, default: false },
+  puntoEnergia: { type: Boolean, default: false },
+  personalCaminando: { type: Boolean, default: false },
+  observaciones: { type: String, default: "" },
+}, { _id: false });
 const ordenServicioSchema = new mongoose.Schema({
   plan_id: { type: mongoose.Schema.Types.ObjectId, ref: "operaciones_planes_trabajo", unique: true, required: true },
   cotizacion_id: { type: mongoose.Schema.Types.ObjectId, ref: "comercial_cotizaciones", required: true },
@@ -12,6 +24,7 @@ const ordenServicioSchema = new mongoose.Schema({
   condicionesIngreso: String,
   trabajoAltoRiesgo: String,
   accesibilidadPuntos: String,
+  consideracionesMonitoreo: { type: consideracionesMonitoreoSchema, default: () => ({}) },
   estaciones: [stationSchema],
   items: [itemSchema],
   estado: { type: String, enum: ["BORRADOR", "APROBADO", "ANULADO"], default: "BORRADOR" },
