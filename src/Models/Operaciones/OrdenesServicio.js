@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const itemSchema = new mongoose.Schema({ matriz: String, parametro: String, metodologia: String, cantidad: Number, acreditacion: String, laboratorio: String }, { _id: false });
-const stationSchema = new mongoose.Schema({ codigo: String, este: String, norte: String, descripcion: String }, { _id: false });
+const stationSchema = new mongoose.Schema({ codigo: String, este: String, norte: String, descripcion: String, zonaUTM: { type: String, default: "" }, datum: { type: String, default: "" } }, { _id: false });
 // Snapshot editable propio de la Orden: una corrección al despacho de un
 // tercero no debe alterar retroactivamente el Plan de Monitoreo.
 const consideracionesMonitoreoSchema = new mongoose.Schema({
@@ -21,6 +21,8 @@ const ordenServicioSchema = new mongoose.Schema({
   // La orden es una vista operativa del plan: conserva el contexto que el laboratorio necesita.
   cliente: { razonSocial: String, ruc: String, direccion: String, contacto: String, telefono: String, correo: String },
   proyecto: { nombre: String, planta: String, lugarEjecucion: String, fechaServicio: Date },
+  fechaElaboracion: { type: Date, default: Date.now },
+  observacionesGenerales: { type: String, default: "" },
   condicionesIngreso: String,
   trabajoAltoRiesgo: String,
   accesibilidadPuntos: String,

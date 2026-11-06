@@ -76,7 +76,7 @@ exports.listarOrdenes = async (req, res) => {
 };
 
 exports.actualizarPlan = async (req, res) => {
-  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "analistaOperaciones", "analistaOperacionesManual", "elaboradoPor", "estado", "programacion"];
+  const allowed = ["cliente", "proyecto", "fechaElaboracion", "observacionesGenerales", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "analistaOperaciones", "analistaOperacionesManual", "elaboradoPor", "estado", "programacion"];
   const changes = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
   const plan = await Plan.findById(req.params.id);
   if (!plan) return res.status(404).json({ message: "Plan no encontrado", type: "Error" });
@@ -97,7 +97,7 @@ exports.actualizarPlan = async (req, res) => {
 };
 
 exports.actualizarOrden = async (req, res) => {
-  const allowed = ["cliente", "proyecto", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "estado"];
+  const allowed = ["cliente", "proyecto", "fechaElaboracion", "observacionesGenerales", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "estado"];
   const changes = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
   const data = await Orden.findByIdAndUpdate(req.params.id, changes, { new: true });
   return data ? res.json({ data, message: "Orden Interna actualizada", type: "Correcto" }) : res.status(404).json({ message: "Orden no encontrada", type: "Error" });

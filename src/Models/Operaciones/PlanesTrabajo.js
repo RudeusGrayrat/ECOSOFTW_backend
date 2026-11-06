@@ -1,7 +1,17 @@
 const mongoose = require("mongoose");
 
 const itemSchema = new mongoose.Schema({ matriz: String, parametro: String, metodologia: String, cantidad: Number, acreditacion: String, laboratorio: String }, { _id: false });
-const stationSchema = new mongoose.Schema({ codigo: String, este: String, norte: String, descripcion: String }, { _id: false });
+// Las coordenadas se conservan completas aunque la plantilla actual solo
+// imprima código/Este/Norte/descripción. Así el Plan no pierde el contexto
+// cartográfico que Operaciones necesita para ejecutar el servicio.
+const stationSchema = new mongoose.Schema({
+  codigo: String,
+  este: String,
+  norte: String,
+  descripcion: String,
+  zonaUTM: { type: String, default: "" },
+  datum: { type: String, default: "" },
+}, { _id: false });
 // Decisiones confirmadas por Operaciones; no se infieren de los comentarios
 // libres enviados por el cliente.
 const consideracionesMonitoreoSchema = new mongoose.Schema({
@@ -40,6 +50,8 @@ const planTrabajoSchema = new mongoose.Schema({
   codigo: { type: String, required: true, unique: true },
   cliente: { razonSocial: String, ruc: String, direccion: String, contacto: String, telefono: String, correo: String },
   proyecto: { nombre: String, planta: String, lugarEjecucion: String, fechaServicio: Date },
+  fechaElaboracion: { type: Date, default: Date.now },
+  observacionesGenerales: { type: String, default: "" },
   condicionesIngreso: String,
   trabajoAltoRiesgo: String,
   accesibilidadPuntos: String,

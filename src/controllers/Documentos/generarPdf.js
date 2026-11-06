@@ -137,7 +137,7 @@ const operationalData = (document, order = false) => {
   return {
     codigo: document.codigo,
     codigo_cotizacion: document.cotizacion_id?.correlativaVisible || "",
-    fecha_elaboracion: date(document.createdAt),
+    fecha_elaboracion: date(document.fechaElaboracion || document.createdAt),
     estado_operacion: document.programacion?.estadoOperacion || document.estado || "",
     cliente: document.cliente?.razonSocial || "",
     ruc: document.cliente?.ruc || "",
@@ -160,7 +160,7 @@ const operationalData = (document, order = false) => {
     revisadoPor: analista,
     aprobadoPor: userName(document.cotizacion_id?.aprobadoPor),
     firma_elaborado: signaturePath(elaboradoPor),
-    otros_observaciones: observacionesGenerales,
+    otros_observaciones: document.observacionesGenerales || observacionesGenerales,
     // Checks explícitamente confirmados por Operaciones. El nombre
     // `seguridadd_cliente` conserva la variable ya existente en el Word.
     disponibilidad_lugar_si: consideraciones.disponibilidadLugar === "SI" ? "X" : "",
