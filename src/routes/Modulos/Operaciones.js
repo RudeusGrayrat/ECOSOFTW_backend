@@ -1,10 +1,12 @@
 const { Router } = require("express");
-const { crearPlan, crearOrden, listarPlanes, listarOrdenes, actualizarPlan, actualizarOrden } = require("../../controllers/Operaciones/planesTrabajo");
+const { crearPlan, crearOrden, previsualizarPlan, previsualizarOrden, listarPlanes, listarOrdenes, actualizarPlan, actualizarOrden } = require("../../controllers/Operaciones/planesTrabajo");
 const cronograma = require("../../controllers/Operaciones/cronograma");
 const documentos = require("../../controllers/Documentos/generarPdf");
 const router = Router();
 router.post("/planes-trabajo/desde-cotizacion/:cotizacionId", crearPlan);
 router.post("/ordenes-internas/desde-plan/:planId", crearOrden);
+router.get("/planes-trabajo/previsualizar/:cotizacionId", previsualizarPlan);
+router.get("/ordenes-internas/previsualizar/:planId", previsualizarOrden);
 router.get("/planes-trabajo", listarPlanes);
 router.get("/ordenes-internas", listarOrdenes);
 router.patch("/planes-trabajo/:id", actualizarPlan);

@@ -5,6 +5,29 @@ const Orden = require("../../Models/Operaciones/OrdenesServicio");
 const escapeRegExp = require("../../utils/escapeRegex");
 
 const mapItem = (item) => { const parameter = item.parametroSnapshot || item.parametro_id || {}; return { matriz: parameter.tipoDeAnalisis || "", parametro: parameter.parametro || "", metodologia: parameter.metodo || "", cantidad: item.cantidad || 0, acreditacion: parameter.acreditadoPor || "", laboratorio: item.proveedor || "" }; };
+const editablePlanFields = ["cliente", "proyecto", "fechaElaboracion", "observacionesGenerales", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "analistaOperaciones", "analistaOperacionesManual", "elaboradoPor", "estado", "programacion"];
+const editableOrderFields = ["cliente", "proyecto", "fechaElaboracion", "observacionesGenerales", "condicionesIngreso", "trabajoAltoRiesgo", "accesibilidadPuntos", "consideracionesMonitoreo", "estaciones", "items", "estado"];
+const picked = (body, keys) => Object.fromEntries(Object.entries(body || {}).filter(([key]) => keys.includes(key)));
+
+const planDraft = async (quote, createdBy) => {
+  const request = quote.solicitud_id ? await Solicitud.findById(quote.solicitud_id) : null;
+  const now = new Date(); const suffix = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const last = await Plan.findOne({ codigo: new RegExp(`-${suffix}$`) }).sort({ correlativo: -1 }).lean();
+  const correlativo = (last?.correlativo || 0) + 1;
+  const client = quote.proyecto_id?.cliente_id || {};
+  const fechaServicio = request?.fechaServicio || quote.proyecto_id?.fechaServicio;
+  return { cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio }, programacion: fechaServicio ? { fechaInicio: fechaServicio, fechaFin: fechaServicio, estadoOperacion: "PROGRAMADO" } : {}, condicionesIngreso: request?.condicionesIngreso || "", trabajoAltoRiesgo: request?.trabajoAltoRiesgo || "", accesibilidadPuntos: request?.accesibilidadPuntos || "", consideracionesMonitoreo: {}, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), elaboradoPor: quote.creadoPor, creadoPor: createdBy };
+};
+
+exports.previsualizarPlan = async (req, res) => {
+  try {
+    const quote = await Cotizacion.findById(req.params.cotizacionId).populate([{ path: "proyecto_id", populate: { path: "cliente_id" } }, { path: "analisis.parametro_id" }]);
+    if (!quote) return res.status(404).json({ message: "Cotización no encontrada", type: "Error" });
+    if (quote.estado !== "APROBADO") return res.status(400).json({ message: "Solo se puede generar un plan desde una cotización aprobada", type: "Advertencia" });
+    if (await Plan.exists({ cotizacion_id: quote._id })) return res.status(409).json({ message: "Ya existe un Plan de Monitoreo para esta cotización", type: "Advertencia" });
+    return res.json({ data: await planDraft(quote, req.query.creadoPor), type: "Correcto" });
+  } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
+};
 
 exports.crearPlan = async (req, res) => {
   try {
@@ -13,13 +36,7 @@ exports.crearPlan = async (req, res) => {
     if (quote.estado !== "APROBADO") return res.status(400).json({ message: "Solo se puede generar un plan desde una cotización aprobada", type: "Advertencia" });
     const existing = await Plan.findOne({ cotizacion_id: quote._id });
     if (existing) return res.json({ message: "El Plan de Monitoreo ya existe", type: "Correcto", data: existing });
-    const request = quote.solicitud_id ? await Solicitud.findById(quote.solicitud_id) : null;
-    const now = new Date(); const suffix = `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const last = await Plan.findOne({ codigo: new RegExp(`-${suffix}$`) }).sort({ correlativo: -1 }).lean();
-    const correlativo = (last?.correlativo || 0) + 1;
-    const client = quote.proyecto_id?.cliente_id || {};
-    const fechaServicio = request?.fechaServicio || quote.proyecto_id?.fechaServicio;
-    const plan = await Plan.create({ cotizacion_id: quote._id, correlativo, codigo: `PM ${String(correlativo).padStart(3, "0")}-${suffix}`, cliente: { razonSocial: quote.facturacion?.razonSocial || client.cliente, ruc: quote.facturacion?.ruc || client.numeroDocumento, direccion: quote.facturacion?.direccion || client.direccionLegal, contacto: request?.contacto?.nombreCompleto || client.nombreContacto, telefono: request?.contacto?.telefono || client.telefono, correo: request?.contacto?.correo || client.correoElectronico }, proyecto: { nombre: quote.proyecto_id?.nombre, planta: request?.nombrePlanta, lugarEjecucion: request?.lugarEjecucion || quote.proyecto_id?.lugarMuestreo, fechaServicio }, programacion: fechaServicio ? { fechaInicio: fechaServicio, fechaFin: fechaServicio, estadoOperacion: "PROGRAMADO" } : {}, condicionesIngreso: request?.condicionesIngreso, trabajoAltoRiesgo: request?.trabajoAltoRiesgo, accesibilidadPuntos: request?.accesibilidadPuntos, consideracionesMonitoreo: {}, estaciones: request?.estaciones || [], items: quote.analisis.map(mapItem), elaboradoPor: quote.creadoPor, creadoPor: req.body.creadoPor });
+    const plan = await Plan.create({ ...(await planDraft(quote, req.body.creadoPor)), ...picked(req.body, editablePlanFields), creadoPor: req.body.creadoPor });
     return res.status(201).json({ message: "Plan de Monitoreo creado", type: "Correcto", data: plan });
   } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
 };
@@ -38,9 +55,21 @@ exports.crearOrden = async (req, res) => {
       cliente: plan.cliente, proyecto: plan.proyecto, condicionesIngreso: plan.condicionesIngreso,
       trabajoAltoRiesgo: plan.trabajoAltoRiesgo, accesibilidadPuntos: plan.accesibilidadPuntos,
       consideracionesMonitoreo: plan.consideracionesMonitoreo?.toObject?.() || plan.consideracionesMonitoreo || {},
-      estaciones: plan.estaciones, items: thirdParty, creadoPor: req.body.creadoPor
+      estaciones: plan.estaciones, items: thirdParty, ...picked(req.body, editableOrderFields), creadoPor: req.body.creadoPor
     });
     return res.status(201).json({ message: "Orden Interna creada", type: "Correcto", data: order });
+  } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
+};
+
+exports.previsualizarOrden = async (req, res) => {
+  try {
+    const plan = await Plan.findById(req.params.planId);
+    if (!plan) return res.status(404).json({ message: "Plan de Monitoreo no encontrado", type: "Error" });
+    if (await Orden.exists({ plan_id: plan._id })) return res.status(409).json({ message: "La Orden Interna ya existe para este plan", type: "Advertencia" });
+    const quote = await Cotizacion.findById(plan.cotizacion_id).populate("analisis.parametro_id");
+    const items = quote.analisis.filter((item) => item.modalidad === "TERCERIZADO").map(mapItem);
+    if (!items.length) return res.status(400).json({ message: "La cotización no contiene servicios tercerizados", type: "Advertencia" });
+    return res.json({ data: { plan_id: plan._id, cotizacion_id: quote._id, correlativoPlan: plan.correlativo, codigo: `ORDEN DE SERVICIO ${String(plan.correlativo).padStart(3, "0")}-${new Date(plan.createdAt).getFullYear()}`, cliente: plan.cliente, proyecto: plan.proyecto, condicionesIngreso: plan.condicionesIngreso || "", trabajoAltoRiesgo: plan.trabajoAltoRiesgo || "", accesibilidadPuntos: plan.accesibilidadPuntos || "", consideracionesMonitoreo: plan.consideracionesMonitoreo?.toObject?.() || plan.consideracionesMonitoreo || {}, estaciones: plan.estaciones || [], items, creadoPor: req.query.creadoPor }, type: "Correcto" });
   } catch (error) { return res.status(500).json({ message: error.message, type: "Error" }); }
 };
 
